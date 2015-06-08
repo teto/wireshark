@@ -74,6 +74,11 @@ static const value_string type_vals[] = {
 	{ 0, NULL }
 };
 
+static const value_string ha_types[] = {
+	{ ARPHRD_NETLINK,    "Netlink" },
+	{ 0, NULL }
+};
+
 static dissector_handle_t netlink_handle;
 
 static header_field_info *hfi_netlink = NULL;
@@ -82,7 +87,7 @@ static header_field_info *hfi_netlink = NULL;
 
 static header_field_info hfi_netlink_hatype NETLINK_HFI_INIT =
 	{ "Link-layer address type",	"netlink.hatype", FT_UINT16, BASE_DEC,
-	  NULL, 0x0, NULL, HFILL };
+	  VALS(ha_types), 0x0, NULL, HFILL };
 
 /* Linux netlink protocol type */
 static header_field_info hfi_netlink_family NETLINK_HFI_INIT =
@@ -99,15 +104,60 @@ static header_field_info hfi_netlink_hdr_type NETLINK_HFI_INIT =
 	  VALS(type_vals), 0x00, NULL, HFILL };
 
 static header_field_info hfi_netlink_hdr_flags NETLINK_HFI_INIT =
-	{ "Flags", "netlink.hdr_flags", FT_UINT16, BASE_HEX,
-	  NULL, 0x00, NULL, HFILL };
+	{ "Flags", "netlink.hdr_flags", FT_UINT16, BASE_DEC,
+    NULL,
+    0x00, "Header flags", HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_echo NETLINK_HFI_INIT =
+	{ "Echo", "netlink.hdr_flags.echo", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_ECHO, NULL, HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_ack NETLINK_HFI_INIT =
+	{ "Ack", "netlink.hdr_flags.ack", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_ACK, "Asking for ack", HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_multi NETLINK_HFI_INIT =
+	{ "Multipart message", "netlink.hdr_flags.multi", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_MULTI, "Multipart message", HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_request NETLINK_HFI_INIT =
+	{ "Request", "netlink.hdr_flags.request", FT_UINT16, BASE_DEC,
+      NULL, WS_NLM_F_REQUEST, "Request message", HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_root NETLINK_HFI_INIT =
+	{ "Specify tree root", "netlink.hdr_flags.root", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_ROOT, "Root", HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_match NETLINK_HFI_INIT =
+	{ "Return all matching", "netlink.hdr_flags.match_all", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_MATCH, NULL, HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_atomic NETLINK_HFI_INIT =
+	{ "Atomic", "netlink.hdr_flags.atomic", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_ATOMIC, NULL, HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_replace NETLINK_HFI_INIT =
+	{ "Replace", "netlink.hdr_flags.replace", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_REPLACE, NULL, HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_excl NETLINK_HFI_INIT =
+	{ "Excl", "netlink.hdr_flags.excl", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_EXCL, NULL, HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_create NETLINK_HFI_INIT =
+	{ "Create", "netlink.hdr_flags.create", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_CREATE, NULL, HFILL };
+
+static header_field_info hfi_netlink_hdr_flag_append NETLINK_HFI_INIT =
+	{ "Append", "netlink.hdr_flags.append", FT_UINT16, BASE_DEC,
+	  NULL, WS_NLM_F_APPEND, NULL, HFILL };
 
 static header_field_info hfi_netlink_hdr_seq NETLINK_HFI_INIT =
-	{ "Sequence", "netlink.hdr_seq", FT_UINT32, BASE_HEX,
+	{ "Sequence", "netlink.hdr_seq", FT_UINT32, BASE_DEC,
 	  NULL, 0x00, NULL, HFILL };
 
 static header_field_info hfi_netlink_hdr_pid NETLINK_HFI_INIT =
-	{ "Port ID", "netlink.hdr_pid", FT_UINT32, BASE_HEX,
+	{ "Port ID", "netlink.hdr_pid", FT_UINT32, BASE_DEC,
 	  NULL, 0x00, NULL, HFILL };
 
 static header_field_info hfi_netlink_attr_len NETLINK_HFI_INIT =
@@ -117,9 +167,37 @@ static header_field_info hfi_netlink_attr_len NETLINK_HFI_INIT =
 static gint ett_netlink_cooked = -1;
 static gint ett_netlink_msghdr = -1;
 static gint ett_netlink_msg = -1;
+static gint ett_netlink_hdr_flags = -1;
 
 static dissector_table_t netlink_dissector_table;
 static dissector_handle_t data_handle;
+
+
+static const int *netlink_header_get_flags[] = {
+&hfi_netlink_hdr_flag_request.id,
+&hfi_netlink_hdr_flag_multi.id,
+&hfi_netlink_hdr_flag_ack.id,
+&hfi_netlink_hdr_flag_echo.id,
+
+&hfi_netlink_hdr_flag_root.id,
+&hfi_netlink_hdr_flag_match.id,
+&hfi_netlink_hdr_flag_atomic.id,
+NULL
+};
+
+static const int *netlink_header_new_flags[] = {
+&hfi_netlink_hdr_flag_request.id,
+&hfi_netlink_hdr_flag_multi.id,
+&hfi_netlink_hdr_flag_ack.id,
+&hfi_netlink_hdr_flag_echo.id,
+
+&hfi_netlink_hdr_flag_replace.id,
+&hfi_netlink_hdr_flag_excl.id,
+&hfi_netlink_hdr_flag_create.id,
+&hfi_netlink_hdr_flag_append.id,
+NULL
+};
+
 
 int
 dissect_netlink_attributes(tvbuff_t *tvb, header_field_info *hfi_type, int ett, void *data, proto_tree *tree, int offset, netlink_attributes_cb_t cb)
@@ -216,9 +294,11 @@ dissect_netlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *_data
 		int pkt_end_offset;
 		guint32 pkt_len;
 		guint32 port_id;
+        guint16 hdr_flags;
 
 		proto_tree *fh_msg;
 		proto_tree *fh_hdr;
+
 
 		int encoding = ENC_LITTLE_ENDIAN; /* XXX */
 
@@ -237,8 +317,19 @@ dissect_netlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *_data
 		data.type = tvb_get_letohs(tvb, offset);
 		offset += 2;
 
-		proto_tree_add_item(fh_hdr, &hfi_netlink_hdr_flags, tvb, offset, 2, encoding);
-		offset += 2;
+        hdr_flags = tvb_get_letohs(tvb, offset);
+        if(hdr_flags & WS_NLM_F_REQUEST) {
+            proto_tree_add_bitmask(fh_hdr, tvb, offset, hfi_netlink_hdr_flags.id,
+                         ett_netlink_hdr_flags, netlink_header_get_flags,
+                         ENC_BIG_ENDIAN);
+        }
+        else {
+            proto_tree_add_bitmask(fh_hdr, tvb, offset, hfi_netlink_hdr_flags.id,
+                         ett_netlink_hdr_flags, netlink_header_new_flags,
+                         ENC_BIG_ENDIAN);
+        }
+
+        offset += 2;
 
 		proto_tree_add_item(fh_hdr, &hfi_netlink_hdr_seq, tvb, offset, 4, encoding);
 		offset += 4;
@@ -286,6 +377,20 @@ proto_register_netlink(void)
 		&hfi_netlink_hdr_len,
 		&hfi_netlink_hdr_type,
 		&hfi_netlink_hdr_flags,
+		&hfi_netlink_hdr_flag_request,
+		&hfi_netlink_hdr_flag_echo,
+		&hfi_netlink_hdr_flag_ack,
+		&hfi_netlink_hdr_flag_multi,
+
+		&hfi_netlink_hdr_flag_root,
+		&hfi_netlink_hdr_flag_match,
+		&hfi_netlink_hdr_flag_atomic,
+
+		&hfi_netlink_hdr_flag_replace,
+		&hfi_netlink_hdr_flag_excl,
+		&hfi_netlink_hdr_flag_create,
+		&hfi_netlink_hdr_flag_append,
+
 		&hfi_netlink_hdr_seq,
 		&hfi_netlink_hdr_pid,
 
@@ -297,7 +402,8 @@ proto_register_netlink(void)
 	static gint *ett[] = {
 		&ett_netlink_cooked,
 		&ett_netlink_msghdr,
-		&ett_netlink_msg
+		&ett_netlink_msg,
+		&ett_netlink_hdr_flags
 	};
 
 	int proto_netlink;
