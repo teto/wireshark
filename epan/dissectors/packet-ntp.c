@@ -578,7 +578,7 @@ static gint ett_ntppriv_auth_seq = -1;
 static gint ett_monlist_item = -1;
 
 static expert_field ei_ntp_ext = EI_INIT;
-
+static expert_field ei_ntp_answer_generation_time = EI_INIT;
 
 
 static void dissect_ntp_std (tvbuff_t *, packet_info *, proto_tree *, guint8);
@@ -827,6 +827,8 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 	int		 i;
 	int		 macofs;
 	gint		 maclen;
+	guint8		 mode;
+	guint64		 ntp_rec, ntp_xmt;
 
 	tf = proto_tree_add_uint(ntp_tree, hf_ntp_flags, tvb, 0, 1, flags);
 
@@ -835,6 +837,7 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 	proto_tree_add_uint(flags_tree, hf_ntp_flags_li,   tvb, 0, 1, flags);
 	proto_tree_add_uint(flags_tree, hf_ntp_flags_vn,   tvb, 0, 1, flags);
 	proto_tree_add_uint(flags_tree, hf_ntp_flags_mode, tvb, 0, 1, flags);
+    mode = flags & NTP_MODE_MASK;
 
 	/* Stratum, 1byte field represents distance from primary source
 	 */
@@ -946,12 +949,36 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 	/* Receive Timestamp: This is the time at which the request arrived at
 	 * the server.
 	 */
+//    ntp_rec = tvb_get_ntoh64(tvb,32);
 	proto_tree_add_item(ntp_tree, hf_ntp_rec, tvb, 32, 8, ENC_TIME_NTP|ENC_BIG_ENDIAN);
 
 	/* Transmit Timestamp: This is the time at which the reply departed the
 	 * server for the client.
 	 */
+//	ntp_xmt = tvb_get_ntoh64(tvb,32);
 	proto_tree_add_item(ntp_tree, hf_ntp_xmt, tvb, 40, 8, ENC_TIME_NTP|ENC_BIG_ENDIAN);
+
+	/*
+	 *
+	 */
+//	proto_tree_add_item(ntp_tree, hf_ntp_xmt, tvb, 40, 8, ENC_TIME_NTP|ENC_BIG_ENDIAN);
+//    ei_ntp_answer_generation_time
+    // PROTO_ITEM_SET_GENERATED or sthg like that
+    if(mode == 4) {         // 4 => server mode
+        // How to display an ns_time
+        nstime_t rec_time, xmit_time, result;
+        ntp_to_nstime(tvb, 32, &rec_time);
+        ntp_to_nstime(tvb, 40, &xmit_time);
+
+        nstime_delta(&result, &xmit_time, &rec_time);
+
+//        ntp_xmt - ntp_rec;
+// In to_str.h
+//rel_time_to_str
+//abs_time_to_str
+//packet_scope()
+        expert_add_info_format(pinfo, tf, &ei_ntp_answer_generation_time, "Time spent in the server %s < 8", abs_time_to_str(,) );
+    }
 
 	/* MAX_MAC_LEN is the largest message authentication code
 	 * (MAC) length.  If we have more data left in the packet
