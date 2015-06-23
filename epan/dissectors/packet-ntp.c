@@ -828,7 +828,7 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 	int		 macofs;
 	gint		 maclen;
 	guint8		 mode;
-	guint64		 ntp_rec, ntp_xmt;
+//	guint64		 ntp_rec, ntp_xmt;
 
 	tf = proto_tree_add_uint(ntp_tree, hf_ntp_flags, tvb, 0, 1, flags);
 
@@ -977,7 +977,13 @@ dissect_ntp_std(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ntp_tree, guint8 
 //rel_time_to_str
 //abs_time_to_str
 //packet_scope()
-        expert_add_info_format(pinfo, tf, &ei_ntp_answer_generation_time, "Time spent in the server %s < 8", abs_time_to_str(,) );
+//display_signed_time
+        expert_add_info_format(pinfo, tf, &ei_ntp_answer_generation_time,
+        "Time spent in the server %s",
+//        abs_time_to_str( wmem_packet_scope(), &result, ABSOLUTE_TIME_LOCAL, FALSE)
+// TODO it would be nice if the format could adapt itself just as in
+				rel_time_to_str(wmem_packet_scope(), &result)
+			);
     }
 
 	/* MAX_MAC_LEN is the largest message authentication code
@@ -1701,6 +1707,7 @@ proto_register_ntp(void)
 
 	static ei_register_info ei[] = {
 		{ &ei_ntp_ext, { "ntp.ext.invalid_length", PI_PROTOCOL, PI_WARN, "Extension invalid length", EXPFILL }},
+		{ &ei_ntp_answer_generation_time, { "ntp.idle_time", PI_PROTOCOL, PI_NOTE, "Time spent in server before replying", EXPFILL }},
 	};
 
 	expert_module_t* expert_ntp;
