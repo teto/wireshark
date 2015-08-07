@@ -112,6 +112,7 @@ set(WIRESHARK_QT_HEADERS
 	sctp_graph_dialog.h
 	sctp_graph_arwnd_dialog.h
 	sctp_graph_byte_dialog.h
+	mptcp_all_connections_dialog.h
 	search_frame.h
 	sequence_diagram.h
 	sequence_dialog.h
@@ -243,6 +244,7 @@ set(WIRESHARK_QT_SRC
 	sctp_graph_dialog.cpp
 	sctp_graph_arwnd_dialog.cpp
 	sctp_graph_byte_dialog.cpp
+	mptcp_all_connections_dialog.cpp
 	search_frame.cpp
 	sequence_diagram.cpp
 	sequence_dialog.cpp
@@ -353,6 +355,7 @@ set(WIRESHARK_QT_UI
 	sctp_graph_dialog.ui
 	sctp_graph_arwnd_dialog.ui
 	sctp_graph_byte_dialog.ui
+	mptcp_all_connections_dialog.ui
 	search_frame.ui
 	sequence_dialog.ui
 	splash_overlay.ui

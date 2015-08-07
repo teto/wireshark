@@ -208,6 +208,8 @@ manage_interfaces_dialog.$(OBJEXT): ui_manage_interfaces_dialog.h
 
 module_preferences_scroll_area.$(OBJEXT): ui_module_preferences_scroll_area.h
 
+mptcp_all_connections_dialog.$(OBJEXT): ui_mptcp_all_connections_dialog.h
+
 packet_comment_dialog.$(OBJEXT): ui_packet_comment_dialog.h
 
 packet_dialog.$(OBJEXT): ui_packet_dialog.h
@@ -228,6 +230,7 @@ rtp_analysis_dialog.$(OBJEXT): ui_rtp_analysis_dialog.h
 
 rtp_stream_dialog.$(OBJEXT): ui_rtp_stream_dialog.h
 
+sctp_assoc_analyse_dialog.cpp sctp_assoc_analyse_dialog.h: ui_sctp_assoc_analyse_dialog.h
 profile_dialog.$(OBJEXT): ui_profile_dialog.h
 
 protocol_hierarchy_dialog.$(OBJEXT): ui_protocol_hierarchy_dialog.h

@@ -40,6 +40,8 @@
      <number>0</number>
     </property>
     <property name="bottomMargin">
+    </property>
+    <property name="margin">
      <number>0</number>
     </property>
     <item>
@@ -67,7 +69,7 @@
        <item>
         <widget class="QLineEdit" name="goToLineEdit">
          <property name="inputMask">
-          <string>900000000</string>
+          <string>900000000; </string>
          </property>
         </widget>
        </item>
@@ -376,6 +378,14 @@
       <string>Conversation Filter</string>
      </property>
     </widget>
+    <widget class="QMenu" name="menuMPTCP">
+     <property name="title">
+      <string>MPTCP</string>
+     </property>
+     <addaction name="actionMPTCPShowAllConnections"/>
+     <addaction name="actionMPTCPFilterThisConnection"/>
+     <addaction name="actionMPTCPAnalyzeThisConnection"/>
+    </widget>
     <addaction name="actionAnalyzeDisplayFilters"/>
     <addaction name="actionAnalyzeDisplayFilterMacros"/>
     <addaction name="separator"/>
@@ -391,6 +401,10 @@
     <addaction name="menuFollow"/>
     <addaction name="separator"/>
     <addaction name="actionAnalyzeExpertInfo"/>
+    <addaction name="menuMPTCP"/>
+    <addaction name="actionAnalyzeFollowTCPStream"/>
+    <addaction name="actionAnalyzeFollowUDPStream"/>
+    <addaction name="actionAnalyzeFollowSSLStream"/>
    </widget>
    <widget class="QMenu" name="menuStatistics">
     <property name="enabled">
@@ -2429,6 +2443,26 @@
    </property>
    <property name="toolTip">
     <string>Add an expression to the display filter.</string>
+   </property>
+  </action>
+  <action name="actionMPTCPAnalyzeThisAssociation">
+   <property name="text">
+    <string>Analyze this Assocation</string>
+   </property>
+  </action>
+  <action name="actionMPTCPShowAllConnections">
+   <property name="text">
+    <string>Show all connections</string>
+   </property>
+  </action>
+  <action name="actionMPTCPFilterThisConnection">
+   <property name="text">
+    <string>Filter this connection</string>
+   </property>
+  </action>
+  <action name="actionMPTCPAnalyzeThisConnection">
+   <property name="text">
+    <string>Analyze this connection</string>
    </property>
   </action>
   <action name="actionStatistics_REGISTER_STAT_GROUP_UNSORTED">

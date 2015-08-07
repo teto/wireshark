@@ -114,6 +114,7 @@
 #include "sctp_all_assocs_dialog.h"
 #include "sctp_assoc_analyse_dialog.h"
 #include "sctp_graph_dialog.h"
+#include "mptcp_all_connections_dialog.h"
 #include "sequence_dialog.h"
 #include "stats_tree_dialog.h"
 #include "stock_icon.h"
@@ -962,7 +963,8 @@ void MainWindow::recentActionTriggered() {
 
 void MainWindow::setMenusForSelectedPacket()
 {
-    gboolean is_ip = FALSE, is_tcp = FALSE, is_udp = FALSE, is_sctp = FALSE, is_ssl = FALSE, is_rtp = FALSE;
+//    gboolean is_ip = FALSE, is_tcp = FALSE, is_udp = FALSE, is_sctp = FALSE, is_ssl = FALSE, is_rtp = FALSE;
+    gboolean is_ip = FALSE, is_tcp = FALSE, is_udp = FALSE, is_sctp = FALSE, is_ssl = FALSE, is_rtp = FALSE, is_mptcp;
 
     /* Making the menu context-sensitive allows for easier selection of the
        desired item and has the added benefit, with large captures, of
@@ -1124,6 +1126,14 @@ void MainWindow::setMenusForSelectedPacket()
     main_ui_->actionSCTPShowAllAssociations->setEnabled(is_sctp);
     main_ui_->actionSCTPFilterThisAssociation->setEnabled(is_sctp);
     main_ui_->actionTelephonyRTPStreamAnalysis->setEnabled(is_rtp);
+
+    if(is_tcp){
+        // TODO check it's MPTCP compliant as well
+        is_mptcp = TRUE;
+    }
+
+    main_ui_->menuMPTCP->setEnabled(is_mptcp);
+    main_ui_->actionMPTCPAnalyzeThisConnection->setEnabled(is_mptcp);
 }
 
 void MainWindow::setMenusForSelectedTreeRow(field_info *fi) {
@@ -2565,6 +2575,52 @@ void MainWindow::statCommandExpertInfo(const char *, void *)
 void MainWindow::on_actionAnalyzeExpertInfo_triggered()
 {
     statCommandExpertInfo(NULL, NULL);
+}
+
+void MainWindow::on_actionMPTCPFilterThisConnection_triggered()
+{
+
+//    sctp_assoc_info_t* assoc = SCTPAssocAnalyseDialog::findAssocForPacket(cap_file_);
+//    if (assoc) {
+    //.arg(assoc->assoc_id)
+        QString newFilter = QString("tcp.options.mptcp.stream==%1").arg("1");
+//        assoc = NULL;
+        emit filterPackets(newFilter, false);
+//    }
+}
+
+
+void MainWindow::on_actionMPTCPAnalyzeThisConnection_triggered()
+{
+
+}
+
+void MainWindow::on_actionMPTCPShowAllConnections_triggered()
+{
+    openMPTCPAllAssocsDialog();
+}
+
+
+void MainWindow::openMPTCPAllAssocsDialog()
+{
+    MPTCPAllConnectionsDialog *mptcp_dialog = new MPTCPAllConnectionsDialog(this, capture_file_.capFile());
+    connect(mptcp_dialog, SIGNAL(filterPackets(QString&,bool)),
+            this, SLOT(filterPackets(QString&,bool)));
+    connect(this, SIGNAL(setCaptureFile(capture_file*)),
+            mptcp_dialog, SLOT(setCaptureFile(capture_file*)));
+    mptcp_dialog->fillTable();
+//
+    if (mptcp_dialog->isMinimized() == true)
+    {
+        mptcp_dialog->showNormal();
+    }
+    else
+    {
+        mptcp_dialog->show();
+    }
+//
+    mptcp_dialog->raise();
+    mptcp_dialog->activateWindow();
 }
 
 

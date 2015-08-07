@@ -244,6 +244,7 @@ FORMS += \
     main_window_preferences_frame.ui \
     manage_interfaces_dialog.ui \
     module_preferences_scroll_area.ui \
+    mptcp_all_connections_dialog.ui \
     packet_comment_dialog.ui \
     packet_dialog.ui \
     packet_format_group_box.ui \
@@ -321,6 +322,7 @@ HEADERS += $$HEADERS_WS_C \
     main_window_preferences_frame.h \
     manage_interfaces_dialog.h \
     module_preferences_scroll_area.h \
+    mptcp_all_connections_dialog.h \
     overlay_scroll_bar.h \
     packet_comment_dialog.h \
     packet_dialog.h \
@@ -669,6 +671,7 @@ SOURCES += \
     display_filter_expression_dialog.cpp \
     elided_label.cpp \
     enabled_protocols_dialog.cpp \
+    mptcp_all_connections_dialog.cpp \
     endpoint_dialog.cpp \
     expert_info_dialog.cpp \
     export_dissection_dialog.cpp \
