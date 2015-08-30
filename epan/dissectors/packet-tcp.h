@@ -52,7 +52,7 @@ extern "C" {
 #define EQ_SEQ(x, y) (x) == (y)
 
 /* mh as in mptcp header */
-typedef struct mptcpheader {
+struct mptcpheader {
 
 	gboolean mh_mpc;    /* true if seen an mp_capable option */
 	gboolean mh_join;   /* true if seen an mp_join option */
@@ -60,18 +60,19 @@ typedef struct mptcpheader {
 	gboolean mh_fastclose;   /* true if seen a fastclose */
 	gboolean mh_fail;   /* true if seen an MP_FAIL */
 
-	guint8  mh_capable_flags;
-	guint8  mh_dss_flags;
+	guint8  mh_capable_flags; /* to get hmac version for instance */
+	guint8  mh_dss_flags; /* data sequence signal flag */
 	guint32 mh_ssn; /* Subflow Sequence Number */
 	guint64 mh_rawdsn; /* Data Sequence Number */
-	guint64 mh_rawack;
-	guint16 mh_length;  /* mapping length */
+	guint64 mh_rawack; /* raw data ack */
+	guint16 mh_length;  /* mapping/DSS length */
 
 	guint64 mh_key; /* recvkey */
-	guint32 mh_token; /* recvkey */
+	guint32 mh_token; /* seen in MP_JOIN. Should be a hash of the initial key */
 
 	guint32 mh_stream; /* this stream index field is included to help differentiate when address/port pairs are reused */
-} mptcp_info_t;
+};
+//mptcp_info_t;
 
 /* the tcp header structure, passed to tap listeners */
 typedef struct tcpheader {
@@ -95,7 +96,8 @@ typedef struct tcpheader {
 	guint32 sack_right_edge[MAX_TCP_SACK_RANGES];
 
 	/* header for TCP option Multipath Operation */
-	mptcp_info_t *th_mptcp;
+//	mptcp_info_t *th_mptcp;
+    struct mptcpheader *th_mptcp;
 } tcp_info_t;
 
 /*
@@ -172,7 +174,7 @@ struct tcp_multisegment_pdu {
 #define MSP_FLAGS_REASSEMBLE_ENTIRE_SEGMENT	0x00000001
 };
 
-#if 0
+//#if 0
 /* One should be able to resegment PDUs across MPTCP connections as well
 
 struct mptcp_multisegment_pdu {
@@ -196,7 +198,9 @@ struct mptcp_unacked {
 	nstime_t ts;
 };
 
-/* can't use GSlist, this is too specific */
+/* can't use GSlist, this is too specific
+could use interval binary tree
+*/
 typedef struct _mptcp_mapping_t {
 struct _mptcp_mapping_t *next;
 guint64 dsn;  /* Data Sequence Number */
@@ -216,13 +220,14 @@ typedef struct _mptcp_meta_flow_t {
 	quand on veut acceder aux champs necessaires ?
 	tcp_flow_t
 */
-
+    int client;    /* did it initiate the connection ? tristate: dunno/yes/no */
 	/* flags exchanged between hosts during 3WHS. Gives checksum/extensiblity/hmac information */
 	guint8 flags;
 
 //	gboolean enable_dsn_tracking;
 	/* TODO check mptcp_get_data_seq_64 */
 //	ou bien faire 2 guint32 highorder_basedsn;
+    // TODO remove redundant with expected_idsn
 	guint64 base_dsn;	/* base data seq number (used by relative sequence numbers) or 0 if not yet known. */
 	guint64 nextseq;	/* highest seen nextseq */
 
@@ -231,7 +236,7 @@ typedef struct _mptcp_meta_flow_t {
 
 // was moved to subflow
 // a la limite mettre un pointeur
-	guint64 key;    /* */
+	guint64 key;    /* if it was set */
 	guint32 token;  /* expected token sha1 digest of keys, truncated to 32 most significant bits derived from key. Stored to speed up subflow/MPTCP connection mapping */
 //	guint64 expected_token;  /* sha1 digest of keys, truncated to 32 most significant bits derived from key. Stored to speed up subflow/MPTCP connection mapping */
 	guint64 expected_idsn;  /* sha1 digest of keys, truncated to 64 LSB */
@@ -243,11 +248,11 @@ typedef struct _mptcp_meta_flow_t {
 /*	guint32 window;		should be equal to TCP window */
 	guint32 fin;		/* frame number of the final FIN */
 
-	wmem_tree_t *dsn_wraps; /* records frames numbers for which 32bits DSN wrapped. Indexed by frame number */
+//	wmem_tree_t *dsn_wraps; /* records frames numbers for which 32bits DSN wrapped. Indexed by frame number */
 } mptcp_meta_flow_t;
 
 /* MPTCP data specific to this subflow direction */
-typedef struct _mptcp_subflow_t {
+struct mptcp_subflow {
 	guint32 nonce;  /* used only for MP_JOIN */
 
 //	guint64 *key;    /* */
@@ -272,13 +277,15 @@ typedef struct _mptcp_subflow_t {
 	mptcp_meta_flow_t *meta_flow;
 
 	/* we are not interested in tracking rcvd mappings yet */
-} mptcp_subflow_t;
-#endif
+};
+
 
 typedef enum {
 	MPTCP_HMAC_SHA1 = 1
 } mptcp_hmac_algorithm_t;
 
+#if 0
+/* this should in fact be the meta */
 typedef struct _mptcp_flow_t {
 	gboolean base_seq_set; /* true if base seq set */
 	guint32 base_seq;	/* base seq number (used by relative sequence numbers)*/
@@ -332,6 +339,7 @@ typedef struct _mptcp_flow_t {
     guint8 version;
 
 } mptcp_subflow_t;
+#endif
 
 #define MBTCP_CAPABLE_CRYPTO_MASK           0x3F
 
@@ -383,6 +391,9 @@ typedef struct _tcp_flow_t {
 	guint32 process_pid;    /* PID of local process */
 	gchar *username;	/* Username of the local process */
 	gchar *command;         /* Local process name + path + args */
+
+	/* MPTCP subflow intel */
+	struct mptcp_subflow *mptcp_subflow;
 } tcp_flow_t;
 
 typedef enum {
@@ -394,13 +405,14 @@ typedef enum {
 } mptcp_connection_state_t;
 
 
-typedef struct _mptcp_flowgroup {
-    mptcp_subflow_t flow1;
-    mptcp_subflow_t flow2;
-} mptcp_flowgroup_t;
+//typedef struct _mptcp_flowgroup {
+//    mptcp_subflow_t flow1;
+//    mptcp_subflow_t flow2;
+//} mptcp_flowgroup_t;
 
-/* This stores
- *
+/* This stores what should be common on both hosts of the MPTCP connection
+ * rename into
+ * - mptcp_connection
  */
 struct mptcp_analysis {
 	mptcp_connection_state_t state;
@@ -425,21 +437,25 @@ struct mptcp_analysis {
 	mptcp_meta_flow_t meta_flow1;
 	mptcp_meta_flow_t meta_flow2;
 #endif
-    mptcp_flowgroup_t* master_flow;
+//    mptcp_flowgroup_t* master_flow;
 
 	/* These pointers are set by XXXXX get_tcp_conversation_data()
 	 * fwd point in the same direction as the current packet
 	 * and rev in the reverse direction
 	 */
-	mptcp_subflow_t* fwd;
-	mptcp_subflow_t* rev;
+//	struct mptcp_subflow* fwd;
+//	struct mptcp_subflow* rev;
 
-	guint32 stream; /* Keep track of unique mptcp stream (per MP_CAPABLE handshake)
+	guint32 stream; /* Keep track of unique mptcp stream (per MP_CAPABLE handshake) */
 
 	/* hmac decided after negociation */
 	mptcp_hmac_algorithm_t hmac_algo;
 
-	/* List of subflows, mptcp_flowgroup_t (tracks tcp stream id or tcp_analisys ?) */
+	/* List of subflows,
+	(list of tcpd . or tcp_flow_t
+	mptcp_flowgroup_t (tracks tcp stream id or tcp_analisys ?)
+	move to meta
+	*/
 	GSList* subflows;
 
 	/* identifier of the tcp stream that saw the initial 3WHS with MP_CAPABLE option */
@@ -462,10 +478,10 @@ struct mptcp_connection {
 	 * fwd point in the same direction as the current packet
 	 * and rev in the reverse direction
 	 */
-	mptcp_subflow_t* fwd;
-	mptcp_subflow_t* rev;
+	struct mptcp_subflow* fwd;
+	struct mptcp_subflow* rev;
 
-    mptcp_flowgroup_t flow;
+//    mptcp_flowgroup_t flow;
 
 	/* hmac decided after negociation */
 	mptcp_hmac_algorithm_t hmac_algo;
@@ -537,8 +553,11 @@ struct tcp_analysis {
 	 */
 	guint16 server_port;
 
-//	struct mptcp_analysis* mptcp_analysis; /* used only when mptcp enabled */
-    struct mptcp_connection* mptcp_connection; 
+    /* allocated only when mptcp enabled
+     * several tcp_analysis may refer to the same mptcp_analysis
+    */
+	struct mptcp_analysis* mptcp_analysis;
+//    struct mptcp_connection* mptcp_connection;
 };
 
 /* Structure that keeps per packet data. First used to be able
