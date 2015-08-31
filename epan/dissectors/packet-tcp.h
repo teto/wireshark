@@ -419,10 +419,10 @@ struct mptcp_analysis {
 
 	guint16 mp_flags; /* MPTCP meta analysis related, see MPTCP_META_* in packet-tcp.c */
 
-	guint64 client_key; /* seen in SYN + MP_CAPABLE */
-	guint64 server_key; /* seen in SYN/ACK + MP_CAPABLE */
+//	guint64 client_key; /* seen in SYN + MP_CAPABLE */
+//	guint64 server_key; /* seen in SYN/ACK + MP_CAPABLE */
 
-    guint8 version; /* Version negotiated */
+//    guint8 version; /* Version negotiated */
 
 #if 0
 	/* For the master subflow (MP_CAPABLE), meta_flow1 is used as mptcp->fwd
@@ -437,6 +437,10 @@ struct mptcp_analysis {
 	mptcp_meta_flow_t meta_flow1;
 	mptcp_meta_flow_t meta_flow2;
 #endif
+
+	mptcp_meta_flow_t *fwd;
+	mptcp_meta_flow_t *rev;
+
 //    mptcp_flowgroup_t* master_flow;
 
 	/* These pointers are set by XXXXX get_tcp_conversation_data()
@@ -462,6 +466,7 @@ struct mptcp_analysis {
 	struct tcp_analysis *master;
 };
 
+#if 0
 struct mptcp_connection {
 	mptcp_connection_state_t state;
 
@@ -486,6 +491,7 @@ struct mptcp_connection {
 	/* hmac decided after negociation */
 	mptcp_hmac_algorithm_t hmac_algo;
 };
+#endif
 
 struct tcp_analysis {
 	/* These two structs are managed based on comparing the source
@@ -555,7 +561,8 @@ struct tcp_analysis {
 
     /* allocated only when mptcp enabled
      * several tcp_analysis may refer to the same mptcp_analysis
-    */
+     * can exist without any meta
+     */
 	struct mptcp_analysis* mptcp_analysis;
 //    struct mptcp_connection* mptcp_connection;
 };
