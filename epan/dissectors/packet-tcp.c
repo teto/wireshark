@@ -2585,8 +2585,8 @@ mptcp_print_analysis(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent_tree,
     proto_item_append_text(tree, ": %s", val_to_str(mptcpd->state, mptcp_state_vs, "Unknown (%d)"));
 //    PROTO_ITEM_SET_GENERATED(item);
 
-    if(mptcpd->state != MPTCP_CON_OK)
-        return ;
+//    if(mptcpd->state != MPTCP_CON_OK)
+//        return ;
 
 
             /* correct seq */
@@ -5513,7 +5513,10 @@ mptcp_alloc_analysis(struct tcp_analysis* tcpd) {
         /* seulement quand on finalise la connection */
 //        mptcpd->subflows = NULL;
     mptcpd->stream = mptcp_stream_count++;
+    tcpd->mptcp_analysis = mptcpd;
 
+    memset(&mptcpd->meta_flow1, 1, sizeof(mptcp_meta_flow_t));
+    memset(&mptcpd->meta_flow2, 1, sizeof(mptcp_meta_flow_t));
 
 //    mptcp_meta_flow_t *meta = (mptcp_meta_flow_t *)wmem_new0(wmem_file_scope(), mptcp_meta_flow_t);
 //    mptcpd->meta
@@ -5538,7 +5541,7 @@ mptcp_alloc_analysis(struct tcp_analysis* tcpd) {
 //    if(tcpd->rev->mptcp_subflow) {
 //
 //    }
-//
+    printf("mptcp_alloc_analysis for tcpd \n"); //, tcpd);
     return mptcpd;
 }
 
@@ -5625,7 +5628,7 @@ dissect_mptcp(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_,
     && (mph->mh_mpc || mph->mh_fail || mph->mh_join))
     {
 //        mptcp_meta_flow_t *meta;
-
+        struct mptcp_analysis *found_mptcpd = 0;
         /* We can allocate a meta/mptcpd */
         if(mph->mh_mpc || mph->mh_fail) {
 
@@ -5648,26 +5651,50 @@ dissect_mptcp(tvbuff_t *tvb _U_, packet_info *pinfo _U_, proto_tree *tree _U_,
 
         /* returns the mptcp_analysis, matching token */
 
-        mptcpd = mptcp_lookup_token(token);
+        found_mptcpd = mptcp_lookup_token(token);
 
+        /* TODO should check if it matches */
          /* if token already registered than an mptcp_analysis should exist */
-         if(mptcpd) {
+         if(found_mptcpd) {
             printf("Found token %u\n", token);
 //            mptcpd = meta->master->mptcp_analysis;
-            mptcp_attach_subflow(mptcpd, tcpd);
+            mptcp_attach_subflow(found_mptcpd, tcpd);
+            mptcpd = found_mptcpd;
          }
          /* else we create it */
          else {
             // tcpd
-            printf("Token %u not found, creating mptcpd\n", token);
-            mptcpd = mptcp_alloc_analysis(tcpd);
+            printf("Token %u not found\n", token);
+
+            if(!mptcpd) {
+//                priontcreating mptcpd
+                mptcpd = mptcp_alloc_analysis(tcpd);
+                mptcpd->meta_flow1.token = token;
+            }
+            else {
+                if(mptcpd->meta_flow1.token == 0) {
+                    mptcpd->meta_flow1.token = token;
+                }
+                else if(mptcpd->meta_flow1.token == 0) {
+                    mptcpd->meta_flow2.token = token;
+                }
+                else {
+                    DISSECTOR_ASSERT_NOT_REACHED();
+                }
+            }
+
             wmem_tree_insert32(mptcp_tokens, token, mptcpd);
+            /* we can use any meta */
+
+//            tcpd->mptcp_analysis = mptcpd;
 //            mptcpd->meta_flow1
 //            meta = mptcp_alloc_meta(tcpd->fwd, token);
 //            meta->mptcp_analysis
 //            meta_flow
 
+
          }
+        DISSECTOR_ASSERT(mptcpd);
 
             // Apres faut faire pointer dans le bon sens les meta
             if(mptcpd->meta_flow1.token == token) {
@@ -6384,9 +6411,9 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         if (tcp_analyze_mptcp) {
             //calls
-#ifdef MPTCP
+//#ifdef MPTCP
             mptcp_print_analysis(pinfo, tvb, tcp_tree, tcpd, tcpd->mptcp_analysis, tcph );
-#endif
+//#endif
         }
     }
 

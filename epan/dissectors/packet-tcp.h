@@ -402,7 +402,7 @@ typedef struct _tcp_flow_t {
 } tcp_flow_t;
 
 typedef enum {
-	MPTCP_CON_SERVER_ABORTED = 0,  /* if 3WHS prevents 3WHS ACK */
+	MPTCP_CON_SAW_SERVER_ASNWER = 0,  /* if 3WHS prevents 3WHS ACK */
 	MPTCP_CON_NO_ALGO_SELECTED,  /* if 3WHS prevents 3WHS ACK or cheksum fails or see MP_FAIL TODO register frame nb where it happens etc...*/
 	MPTCP_CON_PENDING,
 	MPTCP_CON_INCORRECT,
@@ -420,6 +420,8 @@ typedef enum {
  * - mptcp_connection
  */
 struct mptcp_analysis {
+
+    /* */
 	mptcp_connection_state_t state;
 
 	guint16 mp_flags; /* MPTCP meta analysis related, see MPTCP_META_* in packet-tcp.c */
