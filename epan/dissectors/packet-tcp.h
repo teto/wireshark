@@ -210,7 +210,11 @@ guint32 frame;
 nstime_t ts;    /* arrival time */
 } mptcp_mapping_t;
 
-/* look a lot like _tcp_flow_t*/
+/* Should basically look like a_tcp_flow_t but with 64bit sequence number.
+ * It has some extra fields to help
+ *
+ *
+ */
 typedef struct _mptcp_meta_flow_t {
 
 /*	hmac_algo;    algo used to generate hmacs/tokens */
@@ -220,7 +224,8 @@ typedef struct _mptcp_meta_flow_t {
 	quand on veut acceder aux champs necessaires ?
 	tcp_flow_t
 */
-    int client;    /* did it initiate the connection ? tristate: dunno/yes/no */
+    /* did it initiate the connection ? tristate: dunno/yes/no TODO should be in TCP */
+    int client;
 	/* flags exchanged between hosts during 3WHS. Gives checksum/extensiblity/hmac information */
 	guint8 flags;
 
@@ -248,6 +253,7 @@ typedef struct _mptcp_meta_flow_t {
 /*	guint32 window;		should be equal to TCP window */
 	guint32 fin;		/* frame number of the final FIN */
 
+
 //	wmem_tree_t *dsn_wraps; /* records frames numbers for which 32bits DSN wrapped. Indexed by frame number */
 } mptcp_meta_flow_t;
 
@@ -274,8 +280,7 @@ struct mptcp_subflow {
 
 
 	/* meta flow to which it is attached. Helps setting forward and backward meta flow */
-	mptcp_meta_flow_t *meta_flow;
-
+    mptcp_meta_flow_t *meta;
 	/* we are not interested in tracking rcvd mappings yet */
 };
 
@@ -425,19 +430,20 @@ struct mptcp_analysis {
 //    guint8 version; /* Version negotiated */
 
 #if 0
+#endif
 	/* For the master subflow (MP_CAPABLE), meta_flow1 is used as mptcp->fwd
 	 * iff flow1 is used as tcp->fwd
 	 *
 	 * For other subflows, they link the meta via mptcp_subflow_t::meta_flow
 	 * according to the validity of the token.
 	 *
-	 * Meta flows should be used only if the mptcp connection is in a proper state
-	 * (ie got finalized)
+	 * meta flows need to be here
 	 */
 	mptcp_meta_flow_t meta_flow1;
 	mptcp_meta_flow_t meta_flow2;
-#endif
 
+
+    /* should be accessible from tcp */
 	mptcp_meta_flow_t *fwd;
 	mptcp_meta_flow_t *rev;
 
@@ -462,8 +468,9 @@ struct mptcp_analysis {
 	*/
 	GSList* subflows;
 
-	/* identifier of the tcp stream that saw the initial 3WHS with MP_CAPABLE option */
+	    /* identifier of the tcp stream that saw the initial 3WHS with MP_CAPABLE option */
 	struct tcp_analysis *master;
+
 };
 
 #if 0
