@@ -226,6 +226,9 @@ typedef struct _mptcp_meta_flow_t {
 */
     /* did it initiate the connection ? tristate: dunno/yes/no TODO should be in TCP */
     int client;
+    /*  */
+    guint8 static_flags;
+
 	/* flags exchanged between hosts during 3WHS. Gives checksum/extensiblity/hmac information */
 	guint8 flags;
 
@@ -233,7 +236,7 @@ typedef struct _mptcp_meta_flow_t {
 	/* TODO check mptcp_get_data_seq_64 */
 //	ou bien faire 2 guint32 highorder_basedsn;
     // TODO remove redundant with expected_idsn
-	guint64 base_dsn;	/* base data seq number (used by relative sequence numbers) or 0 if not yet known. */
+	guint64 base_dsn;	/* should be taken by master base data seq number (used by relative sequence numbers) or 0 if not yet known. */
 	guint64 nextseq;	/* highest seen nextseq */
 
 	// master tcp stream id  ?
@@ -286,7 +289,10 @@ struct mptcp_subflow {
 
 
 typedef enum {
-	MPTCP_HMAC_SHA1 = 1
+	MPTCP_HMAC_NOT_SET = 0,
+	MPTCP_HMAC_SHA1 = 1,
+	MPTCP_HMAC_LAST,
+
 } mptcp_hmac_algorithm_t;
 
 #if 0
@@ -352,7 +358,8 @@ typedef struct _mptcp_flow_t {
 
 
 typedef struct _tcp_flow_t {
-	gboolean base_seq_set; /* true if base seq set */
+	guint8 static_flags; /* true if base seq set */
+//	gboolean base_seq_set; /* true if base seq set */
 	guint32 base_seq;	/* base seq number (used by relative sequence numbers)*/
 	tcp_unacked_t *segments;
 	guint32 fin;		/* frame number of the final FIN */
@@ -401,6 +408,7 @@ typedef struct _tcp_flow_t {
 	struct mptcp_subflow *mptcp_subflow;
 } tcp_flow_t;
 
+/* ca c pas bon */
 typedef enum {
 	MPTCP_CON_SAW_SERVER_ASNWER = 0,  /* if 3WHS prevents 3WHS ACK */
 	MPTCP_CON_NO_ALGO_SELECTED,  /* if 3WHS prevents 3WHS ACK or cheksum fails or see MP_FAIL TODO register frame nb where it happens etc...*/
@@ -426,13 +434,8 @@ struct mptcp_analysis {
 
 	guint16 mp_flags; /* MPTCP meta analysis related, see MPTCP_META_* in packet-tcp.c */
 
-//	guint64 client_key; /* seen in SYN + MP_CAPABLE */
-//	guint64 server_key; /* seen in SYN/ACK + MP_CAPABLE */
-
 //    guint8 version; /* Version negotiated */
 
-#if 0
-#endif
 	/* For the master subflow (MP_CAPABLE), meta_flow1 is used as mptcp->fwd
 	 * iff flow1 is used as tcp->fwd
 	 *
@@ -445,9 +448,9 @@ struct mptcp_analysis {
 	mptcp_meta_flow_t meta_flow2;
 
 
-    /* should be accessible from tcp */
-	mptcp_meta_flow_t *fwd;
-	mptcp_meta_flow_t *rev;
+    /* should be accessible from tcp annoying */
+//	mptcp_meta_flow_t *fwd;
+//	mptcp_meta_flow_t *rev;
 
 //    mptcp_flowgroup_t* master_flow;
 
@@ -455,8 +458,7 @@ struct mptcp_analysis {
 	 * fwd point in the same direction as the current packet
 	 * and rev in the reverse direction
 	 */
-//	struct mptcp_subflow* fwd;
-//	struct mptcp_subflow* rev;
+
 
 	guint32 stream; /* Keep track of unique mptcp stream (per MP_CAPABLE handshake) */
 
