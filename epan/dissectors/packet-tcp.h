@@ -444,8 +444,8 @@ struct mptcp_analysis {
 	 *
 	 * meta flows need to be here
 	 */
-	mptcp_meta_flow_t meta_flow1;
-	mptcp_meta_flow_t meta_flow2;
+	mptcp_meta_flow_t meta_flow[2];
+//	mptcp_meta_flow_t meta_flow2;
 
 
     /* should be accessible from tcp annoying */
