@@ -806,9 +806,13 @@ static gboolean mptcp_show_both_32_and_64 = TRUE;
 #define TCP_S_SAW_SYNACK   0x04
 
 
-/* Static MPTCP flags . Set in mptcp_meta_flow_t:static_flags */
-#define MPTCP_S_HAS_KEY  0x01
-#define MPTCP_S_HAS_TOKEN  0x02
+/* Describe the fields sniffed and set in mptcp_meta_flow_t:static_flags */
+#define MPTCP_META_HAS_KEY  0x01
+#define MPTCP_META_HAS_TOKEN  0x02
+
+/* Describe the fields sniffed and set in mptcp_meta_flow_t:static_flags */
+#define MPTCP_SUBFLOW_HAS_NONCE 0x01
+#define MPTCP_SUBFLOW_HAS_ADDRESS_ID 0x02
 
 /* MPTCP meta analysis related */
 #define MPTCP_META_CHECKSUM_REQUIRED   0x0002
@@ -825,7 +829,7 @@ mptcp_convert_dsn(guint64 dsn, mptcp_meta_flow_t *meta, enum mptcp_dsn_conversio
      */
     if(conv == DSN_CONV_32_TO_64 || relative) {
 
-        if(!(meta->static_flags & MPTCP_S_HAS_KEY)) {
+        if(!(meta->static_flags & MPTCP_META_HAS_KEY)) {
             /* can't do those without the expected_idsn based on the key */
             return FALSE;
         }
@@ -3134,7 +3138,7 @@ mptcp_get_meta_from_token(struct tcp_analysis* tcpd, tcp_flow_t *tcp_flow, guint
 
 
     /* if token already set for this meta */
-    if( tcp_flow->mptcp_subflow->meta  && (tcp_flow->mptcp_subflow->meta->static_flags & MPTCP_S_HAS_TOKEN)) {
+    if( tcp_flow->mptcp_subflow->meta  && (tcp_flow->mptcp_subflow->meta->static_flags & MPTCP_META_HAS_TOKEN)) {
         return mptcpd;
     }
 
@@ -3156,10 +3160,10 @@ mptcp_get_meta_from_token(struct tcp_analysis* tcpd, tcp_flow_t *tcp_flow, guint
         else {
 
             /* already exists, thus some meta may already have been configured */
-            if(mptcpd->meta_flow[0].static_flags & MPTCP_S_HAS_TOKEN) {
+            if(mptcpd->meta_flow[0].static_flags & MPTCP_META_HAS_TOKEN) {
                 assignedMetaId = 1;
             }
-            else if(mptcpd->meta_flow[1].static_flags & MPTCP_S_HAS_TOKEN) {
+            else if(mptcpd->meta_flow[1].static_flags & MPTCP_META_HAS_TOKEN) {
                 assignedMetaId = 0;
             }
             else {
@@ -3169,7 +3173,7 @@ mptcp_get_meta_from_token(struct tcp_analysis* tcpd, tcp_flow_t *tcp_flow, guint
         }
 
         tcp_flow->mptcp_subflow->meta->token = token;
-        tcp_flow->mptcp_subflow->meta->static_flags |= MPTCP_S_HAS_TOKEN;;
+        tcp_flow->mptcp_subflow->meta->static_flags |= MPTCP_META_HAS_TOKEN;;
 
         wmem_tree_insert32(mptcp_tokens, token, mptcpd);
     }
@@ -3197,7 +3201,7 @@ get_or_create_mptcpd_from_key(struct tcp_analysis* tcpd, tcp_flow_t *fwd, guint6
     guint64 expected_idsn= 0;
     struct mptcp_analysis* mptcpd = tcpd->mptcp_analysis;
 
-    if(fwd->mptcp_subflow->meta && (fwd->mptcp_subflow->meta->static_flags & MPTCP_S_HAS_KEY)) {
+    if(fwd->mptcp_subflow->meta && (fwd->mptcp_subflow->meta->static_flags & MPTCP_META_HAS_KEY)) {
         return mptcpd;
     }
 
@@ -3211,7 +3215,7 @@ get_or_create_mptcpd_from_key(struct tcp_analysis* tcpd, tcp_flow_t *fwd, guint6
 
 
     fwd->mptcp_subflow->meta->key = key;
-    fwd->mptcp_subflow->meta->static_flags |= MPTCP_S_HAS_KEY;
+    fwd->mptcp_subflow->meta->static_flags |= MPTCP_META_HAS_KEY;
     fwd->mptcp_subflow->meta->expected_idsn = expected_idsn;
     return mptcpd;
 }
@@ -3326,9 +3330,8 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                     guint64 recv_key = tvb_get_ntoh64(tvb,offset);
                     proto_tree_add_uint64(mptcp_tree, hf_tcp_option_mptcp_recv_key, tvb, offset, 8, recv_key);
 
-                    /* TODO check it is the same key */
                     if(tcpd->rev->mptcp_subflow->meta
-                        && (tcpd->rev->mptcp_subflow->meta->static_flags & MPTCP_S_HAS_KEY)) {
+                        && (tcpd->rev->mptcp_subflow->meta->static_flags & MPTCP_META_HAS_KEY)) {
 
                         /* compare the echoed key with the server key */
                         if(tcpd->rev->mptcp_subflow->meta->key != recv_key) {
@@ -3344,7 +3347,7 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
 
         case TCPOPT_MPTCP_MP_JOIN:
             mph->mh_join = TRUE;
-            if(optlen != 12 && !mptcpd ) {
+            if(optlen != 12 && !mptcpd) {
                 mptcpd = mptcp_alloc_analysis(tcpd);
             }
             switch (optlen) {
@@ -3355,8 +3358,9 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                          ett_tcp_option_mptcp, tcp_option_mptcp_join_flags,
                          ENC_BIG_ENDIAN);
 
-                    proto_tree_add_item(mptcp_tree, hf_tcp_option_mptcp_address_id, tvb, offset,
-                            2, ENC_BIG_ENDIAN);
+                    fwd->mptcp_subflow->static_flags |= MPTCP_
+                    proto_tree_add_item_ret_int(mptcp_tree, hf_tcp_option_mptcp_address_id, tvb, offset,
+                            2, ENC_BIG_ENDIAN, &fwd->mptcp_subflow->address_id);
                     offset += 2;
 
                     proto_tree_add_item_ret_uint(mptcp_tree, hf_tcp_option_mptcp_recv_token, tvb, offset,
@@ -3365,8 +3369,8 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
 
                     mptcpd = mptcp_get_meta_from_token(tcpd, tcpd->fwd, mph->mh_token);
 
-                    proto_tree_add_item(mptcp_tree, hf_tcp_option_mptcp_sender_rand, tvb, offset,
-                            4, ENC_BIG_ENDIAN);
+                    proto_tree_add_item_ret_int(mptcp_tree, hf_tcp_option_mptcp_sender_rand, tvb, offset,
+                            4, ENC_BIG_ENDIAN, &fwd->mptcp_subflow->address_id);
 
                     }
                     break;
