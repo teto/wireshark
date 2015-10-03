@@ -33,26 +33,6 @@
 #include "wmem_tree.h"
 #include "wmem_user_cb.h"
 
-typedef enum _wmem_node_color_t {
-    WMEM_NODE_COLOR_RED,
-    WMEM_NODE_COLOR_BLACK
-} wmem_node_color_t;
-
-struct _wmem_tree_node_t {
-    struct _wmem_tree_node_t *parent;
-    struct _wmem_tree_node_t *left;
-    struct _wmem_tree_node_t *right;
-
-    const void *key;
-    void *data;
-
-    wmem_node_color_t color;
-    gboolean          is_subtree;
-    gboolean          is_removed;
-};
-
-typedef struct _wmem_tree_node_t wmem_tree_node_t;
-
 struct _wmem_tree_t {
     wmem_allocator_t *master;
     wmem_allocator_t *allocator;
@@ -445,10 +425,10 @@ wmem_tree_insert(wmem_tree_t *tree, const void *key, void *data, compare_func cm
     rb_insert_case1(tree, new_node);
 }
 
-void
+void *
 wmem_tree_insert32(wmem_tree_t *tree, guint32 key, void *data)
 {
-    lookup_or_insert32(tree, key, NULL, data, FALSE, TRUE);
+    return lookup_or_insert32(tree, key, NULL, data, FALSE, TRUE);
 }
 
 void *
@@ -690,6 +670,60 @@ wmem_tree_foreach_nodes(wmem_tree_node_t* node, wmem_foreach_func callback,
     return FALSE;
 }
 
+
+/* HACK matt, modification of wmem_tree_foreach_nodes to:
+- pass node instead of data
+- update left and right children before oneself
+*/
+static gboolean
+wmem_tree_foreach_nodes_matt(wmem_tree_node_t* node, wmem_foreach_func callback,
+        void *user_data)
+{
+    gboolean stop_traverse = FALSE;
+
+    if (!node) {
+        return FALSE;
+    }
+
+    if (node->left) {
+        if (wmem_tree_foreach_nodes(node->left, callback, user_data)) {
+            return TRUE;
+        }
+    }
+
+    if(node->right) {
+        if (wmem_tree_foreach_nodes(node->right, callback, user_data)) {
+            return TRUE;
+        }
+    }
+
+    if (node->is_subtree) {
+        stop_traverse = wmem_tree_foreach((wmem_tree_t *)node->data,
+                callback, user_data);
+    } else if (!node->is_removed) {
+        /* No callback for "removed" nodes */
+        stop_traverse = callback(node, user_data);
+    }
+
+    if (stop_traverse) {
+        return TRUE;
+    }
+
+
+
+    return FALSE;
+}
+
+gboolean
+wmem_tree_foreach_matt(wmem_tree_t* tree, wmem_foreach_func callback,
+        void *user_data)
+{
+    if(!tree->root)
+        return FALSE;
+
+    return wmem_tree_foreach_nodes_matt(tree->root, callback, user_data);
+}
+
 gboolean
 wmem_tree_foreach(wmem_tree_t* tree, wmem_foreach_func callback,
         void *user_data)
@@ -700,10 +734,10 @@ wmem_tree_foreach(wmem_tree_t* tree, wmem_foreach_func callback,
     return wmem_tree_foreach_nodes(tree->root, callback, user_data);
 }
 
-static void wmem_print_subtree(wmem_tree_t *tree, guint32 level);
+static void wmem_print_subtree(wmem_tree_t *tree, guint32 level, wmem_foreach_func callback);
 
 static void
-wmem_tree_print_nodes(const char *prefix, wmem_tree_node_t *node, guint32 level)
+wmem_tree_print_nodes(const char *prefix, wmem_tree_node_t *node, guint32 level, wmem_foreach_func callback)
 {
     guint32 i;
 
@@ -714,23 +748,28 @@ wmem_tree_print_nodes(const char *prefix, wmem_tree_node_t *node, guint32 level)
         printf("    ");
     }
 
-    printf("%sNODE:%p parent:%p left:%p right:%p colour:%s key:%u %s:%p\n",
+    printf("%sNODE:%p parent:%p left:%p right:%p colour:%s key:%u %s:%p",
             prefix,
             (void *)node, (void *)node->parent,
             (void *)node->left, (void *)node->right,
             node->color?"Black":"Red", GPOINTER_TO_UINT(node->key),
             node->is_subtree?"tree":"data", node->data);
+    if(callback) {
+        callback(node->data, NULL);
+    }
+    printf("\n");
+
     if (node->left)
-        wmem_tree_print_nodes("L-", node->left, level+1);
+        wmem_tree_print_nodes("L-", node->left, level+1, callback);
     if (node->right)
-        wmem_tree_print_nodes("R-", node->right, level+1);
+        wmem_tree_print_nodes("R-", node->right, level+1, callback);
 
     if (node->is_subtree)
-        wmem_print_subtree((wmem_tree_t *)node->data, level+1);
+        wmem_print_subtree((wmem_tree_t *)node->data, level+1, callback);
 }
 
 static void
-wmem_print_subtree(wmem_tree_t *tree, guint32 level)
+wmem_print_subtree(wmem_tree_t *tree, guint32 level, wmem_foreach_func callback)
 {
     guint32 i;
 
@@ -743,16 +782,22 @@ wmem_print_subtree(wmem_tree_t *tree, guint32 level)
 
     printf("WMEM tree:%p root:%p\n", (void *)tree, (void *)tree->root);
     if (tree->root) {
-        wmem_tree_print_nodes("Root-", tree->root, level);
+        wmem_tree_print_nodes("Root-", tree->root, level, callback);
     }
 }
 
 void
 wmem_print_tree(wmem_tree_t *tree)
 {
-    wmem_print_subtree(tree, 0);
+    wmem_print_subtree(tree, 0, NULL);
 }
 
+
+void
+wmem_print_tree_with_values(wmem_tree_t *tree, wmem_foreach_func callback)
+{
+    wmem_print_subtree(tree, 0, callback);
+}
 /*
  * Editor modelines  -  http://www.wireshark.org/tools/modelines.html
  *

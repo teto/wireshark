@@ -30,6 +30,7 @@ extern "C" {
 
 #include <epan/conversation.h>
 #include <epan/wmem/wmem.h>
+#include <epan/wmem/wmem_interval_tree.h>
 
 /* TCP flags */
 #define TH_FIN  0x0001
@@ -173,6 +174,24 @@ struct tcp_multisegment_pdu {
 };
 
 
+typedef struct _mptcp_mapping_t {
+/* Should match exactly wmem_range_t, mimic structure inheritance in C */
+//guint32 low;
+//guint32 high;
+//guint32 max_edge;
+wmem_range_t range; /* use offsetof to retrieve mapping from registered range */
+
+/* additionnal fields */
+guint64 dsn;
+guint32 frame;  /* set with PINFO_FD_NUM */
+} mptcp_mapping_t;
+/*
+TODO the mapping should also say from which stream it was discovered
+y ajouter le numero de paquet
+ For now they are the same
+*/
+//typedef struct _wmem_range_t mptcp_mapping_t;
+
 /* Should basically look like a_tcp_flow_t but for mptcp with 64bit sequence number.
 The meta is specific to a direction of the communication and aggregates information of
 all the subflows
@@ -199,6 +218,7 @@ typedef struct _mptcp_meta_flow_t {
 
 	guint32 fin;		/* frame number of the final dataFIN */
 
+	wmem_itree_t *dsn_map;  /* Maps DSN to packets */
 } mptcp_meta_flow_t;
 
 /* MPTCP data specific to this subflow direction */
@@ -207,6 +227,7 @@ struct mptcp_subflow {
 	guint32 nonce;       /* used only for MP_JOIN */
 	guint8 address_id;   /* sent during an MP_JOIN */
 
+	wmem_itree_t *mappings;  /* Map SSN to a DSS mappings */
 	/* meta flow to which it is attached. Helps setting forward and backward meta flow */
 	mptcp_meta_flow_t *meta;
 };

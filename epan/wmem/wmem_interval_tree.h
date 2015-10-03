@@ -21,10 +21,11 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#ifndef __WMEM_TREE_H__
-#define __WMEM_TREE_H__
+#ifndef __WMEM_INTERVAL_TREE_H__
+#define __WMEM_INTERVAL_TREE_H__
 
 #include "wmem_core.h"
+#include "wmem_tree.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,7 +35,8 @@ extern "C" {
  *  @{
  *    @defgroup wmem-interval-tree Interval Tree
  *
- *
+ *http://www.geeksforgeeks.org/interval-tree/
+ * The idea is to augment a self-balancing Binary Search Tree (BST) like Red Black Tree, AVL Tree, etc to maintain set of intervals so that all operations can be done in O(Logn) tim
  *    @{
  */
 
@@ -44,35 +46,45 @@ typedef struct _wmem_tree_t wmem_itree_t;
 
 // TODO should be able to use different keys, 32 bits for instance ? and pass an enum
 // Use 64 bits to allow for mptcp
+// mptcp_mapping_t should have at the beginning the size of wmem_range_t (C POO)
 struct _wmem_range_t {
 
-guint64 low;
-guint64 high;
-guint64 max_edge;   /* max value among right subtrees */
+guint32 low;
+guint32 high;
+guint32 max_edge;   /* max value among right subtrees */
 
 };
 
 typedef struct _wmem_range_t wmem_range_t;
 
 WS_DLL_PUBLIC
+wmem_itree_t *
+wmem_itree_new(wmem_allocator_t *allocator)
+G_GNUC_MALLOC;
+
+WS_DLL_PUBLIC
 void
-wmem_itree_insert(wmem_itree_t *tree, wmem_range_t );
+wmem_itree_insert(wmem_itree_t *tree, wmem_range_t *);
+
+WS_DLL_PUBLIC
+void
+wmem_itree_update_maxima(wmem_itree_t *tree);
 
 /* 
 Save results in 
+TODO pass as results parameters a GSList, for now deal with a simple case, only one result
 */
 WS_DLL_PUBLIC
 void
 wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t interval, wmem_range_t *results);
 
 
-
 /* 
 Save results in 
 */
 WS_DLL_PUBLIC
 void
-wmem_itree_find_point(wmem_itree_t *tree, guint64_t point, wmem_range_t *results);
+wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t *results);
 
 
 #ifdef __cplusplus

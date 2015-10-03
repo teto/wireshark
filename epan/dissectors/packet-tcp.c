@@ -270,9 +270,12 @@ static int hf_mptcp_data_ack = -1;
 static int hf_mptcp_stream = -1;
 static int hf_mptcp_expected_token = -1;
 static int hf_mptcp_analysis = -1;
+static int hf_mptcp_analysis_mapping = -1;
 static int hf_mptcp_analysis_master = -1;
 static int hf_mptcp_analysis_subflows_stream_id = -1;
 static int hf_mptcp_analysis_subflows = -1;
+static int hf_mptcp_seg_dsn_start = -1;
+static int hf_mptcp_seg_dsn_end = -1;
 
 static int hf_tcp_option_fast_open = -1;
 static int hf_tcp_option_fast_open_cookie_request = -1;
@@ -3086,6 +3089,10 @@ mptcp_alloc_analysis(struct tcp_analysis* tcpd) {
     tcpd->mptcp_analysis = mptcpd;
 
     memset(&mptcpd->meta_flow, 2, sizeof(mptcp_meta_flow_t));
+    
+    /* allocate trees for each meta flow */
+    mptcpd->meta_flow[0].dsn_map = wmem_itree_new(wmem_file_scope());
+    mptcpd->meta_flow[1].dsn_map = wmem_itree_new(wmem_file_scope());
 
     /* arbitrary assignment. Callers may override this */
     tcpd->fwd->mptcp_subflow->meta = &mptcpd->meta_flow[0];
@@ -3430,7 +3437,10 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
 
             /* Mapping present */
             if (mph->mh_dss_flags & MPTCP_DSS_FLAG_MAPPING_PRESENT) {
+
                 guint64 dsn;
+                mptcp_mapping_t *mapping = NULL;
+
                 if (mph->mh_dss_flags & MPTCP_DSS_FLAG_DSN_8BYTES) {
 
                     dsn = tvb_get_ntoh64(tvb,offset);
@@ -3457,7 +3467,7 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                 if(mptcp_convert_dsn(mph->mh_rawdsn, tcpd->fwd->mptcp_subflow->meta,
                     (mph->mh_dss_flags & MPTCP_DSS_FLAG_DATA_8BYTES) ? DSN_CONV_NONE : DSN_CONV_32_TO_64, tcp_relative_seq, &dsn)) {
                     item = proto_tree_add_uint64(mptcp_tree, hf_mptcp_dsn, tvb, 0, 0, dsn);
-                        if (tcp_relative_seq) {
+                    if (tcp_relative_seq) {
                             proto_item_append_text(item, " (Relative)");
                     }
                     PROTO_ITEM_SET_GENERATED(item);
@@ -3466,13 +3476,67 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                     /* ignore and continue */
                 }
 
+                
+                /* if mapping analysis enabled */
+                if(mptcp_analyze_mappings) 
+                {
+//                    GSlist *results = NULL;
+                    wmem_range_t *results = NULL;
+                    wmem_range_t requested_ssn_range;
+
+                    if (!PINFO_FD_VISITED(pinfo)) 
+                    {
+                        /* register SSN range described by the mapping into a subflow interval_tree 
+                         to allow packets without mappings to be 
+                        */
+                        mapping = wmem_new0(wmem_file_scope(), mptcp_mapping_t);
+                        mapping->range.low  = mph->mh_ssn;
+                        mapping->range.high = mph->mh_ssn + mph->mh_length-1;
+                        mapping->range.max_edge = 0;
+                        mapping->dsn  = mph->mh_rawdsn;
+                        mapping->frame = PINFO_FD_NUM(pinfo);
+
+//                        wmem_tree_insert32(tcpd->fwd->mptcp_subflow, mph->mh_ssn, mapping);
+                        wmem_itree_insert(tcpd->fwd->mptcp_subflow->mappings, &mapping->range);
+                        
+                        
+                        // TODO add 
+                        
+                    }
+
+                    
+
+                    
+                    /* retrieve all mappings that cover this packet */
+                    requested_ssn_range.low = tcph->th_seq;
+                    requested_ssn_range.high = tcph->th_seq + tcph->th_seglen;
+                    requested_ssn_range.max_edge = 0;
+
+                    wmem_itree_find_interval(tcpd->fwd->mptcp_subflow->mappings, requested_ssn_range, results);
+
+                    /* display in */
+                    mapping =  (mptcp_mapping_t *) (results - offsetof(mptcp_mapping_t, range));
+//                    proto_tree_add_uint_format_value(
+//                        mptcp_tree, hf_mptcp_analysis_mapping, tvb, offset,  
+//                        );
+
+                    /* register the mapping dsn <-> data into the meta */
+//                    if (!PINFO_FD_VISITED(pinfo)) 
+//                    {
+
+                    /* todo check if this returns several results or not */
+
+                    /* look for additionnal information from other subflows */
+                    
+                }
+                
                 if ((int)optlen >= offset-start_offset+4)
                 {
                     proto_tree_add_item(mptcp_tree,
                                 hf_tcp_option_mptcp_checksum, tvb, offset,
                                 2, ENC_BIG_ENDIAN);
                 }
-            }
+            } /* end of mapping */
             break;
 
         case TCPOPT_MPTCP_ADD_ADDR:
@@ -6500,6 +6564,18 @@ proto_register_tcp(void)
         { &hf_mptcp_analysis,
           { "MPTCP analysis",   "mptcp.analysis", FT_NONE, BASE_NONE, NULL, 0x0,
             "This frame has some of the MPTCP analysis shown", HFILL }},
+
+        { &hf_mptcp_analysis_mapping,
+            { "DSS mapping analysis",   "mptcp.analysis.mapping", FT_NONE, BASE_NONE, NULL, 0x0,
+            "This frame has some of the MPTCP analysis shown", HFILL }},
+
+        { &hf_mptcp_seg_dsn_start,
+          { "Segment Data Sequence Number start", "mptcp.dsn_start", FT_UINT64,
+            BASE_DEC, NULL, 0x0, NULL, HFILL}},
+
+        { &hf_mptcp_seg_dsn_end,
+          { "Segment Data Sequence Number end", "mptcp.dsn_end", FT_UINT64,
+            BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
         { &hf_mptcp_analysis_subflows,
           { "TCP subflow stream id(s):",   "mptcp.analysis.subflows", FT_NONE, BASE_NONE, NULL, 0x0,

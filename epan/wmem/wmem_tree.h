@@ -48,6 +48,28 @@ extern "C" {
 struct _wmem_tree_t;
 typedef struct _wmem_tree_t wmem_tree_t;
 
+
+typedef enum _wmem_node_color_t {
+    WMEM_NODE_COLOR_RED,
+    WMEM_NODE_COLOR_BLACK
+} wmem_node_color_t;
+
+
+struct _wmem_tree_node_t {
+    struct _wmem_tree_node_t *parent;
+    struct _wmem_tree_node_t *left;
+    struct _wmem_tree_node_t *right;
+
+    const void *key;
+    void *data;
+
+    wmem_node_color_t color;
+    gboolean          is_subtree;
+    gboolean          is_removed;
+};
+
+typedef struct _wmem_tree_node_t wmem_tree_node_t;
+
 /** Creates a tree with the given allocator scope. When the scope is emptied,
  * the tree is fully destroyed. */
 WS_DLL_PUBLIC
@@ -89,7 +111,7 @@ wmem_tree_is_empty(wmem_tree_t *tree);
  * either ensure the key is unique, or do a lookup before each insert.
  */
 WS_DLL_PUBLIC
-void
+void *
 wmem_tree_insert32(wmem_tree_t *tree, guint32 key, void *data);
 
 /** Look up a node in the tree indexed by a guint32 integer value. If no node is
@@ -203,8 +225,15 @@ wmem_tree_lookup32_array_le(wmem_tree_t *tree, wmem_tree_key_t *key);
 /** Function type for processing one node of a tree during a traversal. Value is
  * the value of the node, userdata is whatever was passed to the traversal
  * function. If the function returns TRUE the traversal will end prematurely.
+ 
  */
 typedef gboolean (*wmem_foreach_func)(void *value, void *userdata);
+
+/* HACK MATT : value est le wmem_tree_node_t et n,on plus la valeur 
+besoin d'une nouvelle fct sinon ca va casser le reste du code
+*/
+/* wmem_tree_node_t */
+//typedef gboolean (*wmem_foreach_func)(void *value, void *userdata);
 
 /** Traverse the tree and call callback(value, userdata) for each value found.
  * Returns TRUE if the traversal was ended prematurely by the callback.
@@ -214,9 +243,24 @@ gboolean
 wmem_tree_foreach(wmem_tree_t* tree, wmem_foreach_func callback,
         void *user_data);
 
+WS_DLL_PUBLIC
+gboolean
+wmem_tree_foreach_matt(wmem_tree_t* tree, wmem_foreach_func callback,
+        void *user_data);
+
+/* addition MATT */
+//WS_DLL_PUBLIC
+//gboolean
+//wmem_tree_foreach_nodes(wmem_tree_node_t* node, wmem_foreach_func callback,
+//        void *user_data);
+        
 /** Prints the structure of the tree to stdout. Primarily for debugging. */
 void
 wmem_print_tree(wmem_tree_t *tree);
+
+/* */
+void
+wmem_print_tree_with_values(wmem_tree_t *tree, wmem_foreach_func callback);
 
 /**   @}
  *  @} */
