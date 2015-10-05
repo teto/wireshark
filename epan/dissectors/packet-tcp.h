@@ -174,23 +174,36 @@ struct tcp_multisegment_pdu {
 };
 
 
-typedef struct _mptcp_mapping_t {
-/* Should match exactly wmem_range_t, mimic structure inheritance in C */
-//guint32 low;
-//guint32 high;
-//guint32 max_edge;
-wmem_range_t range; /* use offsetof to retrieve mapping from registered range */
+typedef struct _mptcp_dsn2packet_mapping_t {
+
+/* use offsetof to retrieve mapping from registered range */
+wmem_range_t dsn_range; 
 
 /* additionnal fields */
-guint64 dsn;
+//guint64 dsn;    /* */
+guint32 frame;  /* packet to look into PINFO_FD_NUM */
+struct tcp_analysis* subflow;   /* in order to get statistics */
+} mptcp_dss_mapping_t;
+
+
+/* Represents the MPTCP DSS option mapping part 
+ It allows to map subflow sequence number to global MPTCP sequence numbers
+*/
+typedef struct _mptcp_dss_mapping_t {
+
+/* SSN range use offsetof to retrieve mapping from registered range */
+wmem_range_t ssn_range; 
+
+/* additionnal fields */
+guint64 dsn;    /* matches the low member of range */
 guint32 frame;  /* set with PINFO_FD_NUM */
-} mptcp_mapping_t;
+} mptcp_dss_mapping_t;
 /*
 TODO the mapping should also say from which stream it was discovered
 y ajouter le numero de paquet
  For now they are the same
 */
-//typedef struct _wmem_range_t mptcp_mapping_t;
+//typedef struct _wmem_range_t mptcp_dss_mapping_t;
 
 /* Should basically look like a_tcp_flow_t but for mptcp with 64bit sequence number.
 The meta is specific to a direction of the communication and aggregates information of

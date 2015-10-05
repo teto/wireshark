@@ -386,6 +386,7 @@ static expert_field ei_mptcp_analysis_unexpected_idsn = EI_INIT;
 static expert_field ei_mptcp_analysis_echoed_key_mismatch = EI_INIT;
 static expert_field ei_mptcp_analysis_missing_algorithm = EI_INIT;
 static expert_field ei_mptcp_analysis_unsupported_algorithm = EI_INIT;
+static expert_field ei_mptcp_mapping_missing = EI_INIT;
 
 /* Some protocols such as encrypted DCE/RPCoverHTTP have dependencies
  * from one PDU to the next PDU and require that they are called in sequence.
@@ -3197,6 +3198,14 @@ get_or_create_mptcpd_from_key(struct tcp_analysis* tcpd, tcp_flow_t *fwd, guint6
 }
 
 
+
+static 
+gboolean
+mptcp_map_ssn_to_dsn()
+{
+
+}
+
 /*
  * The TCP Extensions for Multipath Operation with Multiple Addresses
  * are defined in RFC 6824
@@ -3487,26 +3496,20 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                     if (!PINFO_FD_VISITED(pinfo)) 
                     {
                         /* register SSN range described by the mapping into a subflow interval_tree 
-                         to allow packets without mappings to be 
                         */
                         mapping = wmem_new0(wmem_file_scope(), mptcp_mapping_t);
-                        mapping->range.low  = mph->mh_ssn;
-                        mapping->range.high = mph->mh_ssn + mph->mh_length-1;
-                        mapping->range.max_edge = 0;
+
+                        mapping->ssn_range.max_edge = 0;
                         mapping->dsn  = mph->mh_rawdsn;
                         mapping->frame = PINFO_FD_NUM(pinfo);
 
 //                        wmem_tree_insert32(tcpd->fwd->mptcp_subflow, mph->mh_ssn, mapping);
-                        wmem_itree_insert(tcpd->fwd->mptcp_subflow->mappings, &mapping->range);
-                        
-                        
-                        // TODO add 
-                        
+                        wmem_itree_insert(tcpd->fwd->mptcp_subflow->mappings, &mapping->ssn_range);
+
+                        mapping->ssn_range.low  = mph->mh_ssn;
+                        mapping->ssn_range.high = mph->mh_ssn + mph->mh_length-1;
                     }
 
-                    
-
-                    
                     /* retrieve all mappings that cover this packet */
                     requested_ssn_range.low = tcph->th_seq;
                     requested_ssn_range.high = tcph->th_seq + tcph->th_seglen;
@@ -3514,12 +3517,40 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
 
                     wmem_itree_find_interval(tcpd->fwd->mptcp_subflow->mappings, requested_ssn_range, results);
 
-                    /* display in */
-                    mapping =  (mptcp_mapping_t *) (results - offsetof(mptcp_mapping_t, range));
-//                    proto_tree_add_uint_format_value(
-//                        mptcp_tree, hf_mptcp_analysis_mapping, tvb, offset,  
-//                        );
+                    if(!results) {
+                        // TODO use add format to add ssns
+                        expert_add_info(pinfo, item, &ei_mptcp_mapping_missing);
+                    }
+                    else {
+                        //mptcp_map_ssn_to_dsn
+                        /* results should be some kind of GSList in case 2 DSS are needed to cover this packet */
+                        /* display in */
+                        mapping =  (mptcp_mapping_t *) (results - offsetof(mptcp_mapping_t, ssn_range));
 
+                        item = proto_tree_add_uint_format_value(
+                            mptcp_tree, hf_mptcp_seg_dsn_start, tvb, offset,  
+                            );
+                        PROTO_ITEM_SET_GENERATED(item);
+
+                        item = proto_tree_add_uint_format_value(
+                            mptcp_tree, hf_mptcp_seg_dsn_end, tvb, offset,  
+                            );
+                        
+                        PROTO_ITEM_SET_GENERATED(item);
+                        
+                        /* now if this is the first time, we need to register it */
+                        if (!PINFO_FD_VISITED(pinfo)) 
+                        {
+                            mptcp_dsn2packet_mapping_t *packet;
+                            packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
+                            packet->dsn_range.low = 
+                            packet->dsn_range.high = 
+                            packet->dsn_range.max_edge = 
+                        }
+                    }
+
+                    
+//            
                     /* register the mapping dsn <-> data into the meta */
 //                    if (!PINFO_FD_VISITED(pinfo)) 
 //                    {
@@ -6538,6 +6569,7 @@ proto_register_tcp(void)
         { &ei_mptcp_analysis_echoed_key_mismatch, { "mptcp.analysis.echoed_key_mismatch", PI_PROTOCOL, PI_WARN, "The echoed key in the ACK of the MPTCP handshake does not match the key of the SYN/ACK", EXPFILL }},
         { &ei_mptcp_analysis_missing_algorithm, { "mptcp.analysis.missing_algorithm", PI_PROTOCOL, PI_WARN, "No crypto algorithm specified", EXPFILL }},
         { &ei_mptcp_analysis_unsupported_algorithm, { "mptcp.analysis.unsupported_algorithm", PI_PROTOCOL, PI_WARN, "Unsupported algorithm", EXPFILL }},
+        { &ei_mptcp_mapping_missing, { "mptcp.dss.missing_mapping", PI_PROTOCOL, PI_WARN, "No mapping available", EXPFILL }},
     };
 
     static hf_register_info mptcp_hf[] = {
