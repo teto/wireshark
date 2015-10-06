@@ -3090,7 +3090,7 @@ mptcp_alloc_analysis(struct tcp_analysis* tcpd) {
     tcpd->mptcp_analysis = mptcpd;
 
     memset(&mptcpd->meta_flow, 2, sizeof(mptcp_meta_flow_t));
-    
+
     /* allocate trees for each meta flow */
     mptcpd->meta_flow[0].dsn_map = wmem_itree_new(wmem_file_scope());
     mptcpd->meta_flow[1].dsn_map = wmem_itree_new(wmem_file_scope());
@@ -3199,7 +3199,7 @@ get_or_create_mptcpd_from_key(struct tcp_analysis* tcpd, tcp_flow_t *fwd, guint6
 
 
 
-static 
+static
 gboolean
 mptcp_map_ssn_to_dsn()
 {
@@ -3485,17 +3485,17 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                     /* ignore and continue */
                 }
 
-                
+
                 /* if mapping analysis enabled */
-                if(mptcp_analyze_mappings) 
+                if(mptcp_analyze_mappings)
                 {
 //                    GSlist *results = NULL;
                     wmem_range_t *results = NULL;
                     wmem_range_t requested_ssn_range;
 
-                    if (!PINFO_FD_VISITED(pinfo)) 
+                    if (!PINFO_FD_VISITED(pinfo))
                     {
-                        /* register SSN range described by the mapping into a subflow interval_tree 
+                        /* register SSN range described by the mapping into a subflow interval_tree
                         */
                         mapping = wmem_new0(wmem_file_scope(), mptcp_mapping_t);
 
@@ -3528,39 +3528,39 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                         mapping =  (mptcp_mapping_t *) (results - offsetof(mptcp_mapping_t, ssn_range));
 
                         item = proto_tree_add_uint_format_value(
-                            mptcp_tree, hf_mptcp_seg_dsn_start, tvb, offset,  
+                            mptcp_tree, hf_mptcp_seg_dsn_start, tvb, offset,
                             );
                         PROTO_ITEM_SET_GENERATED(item);
 
                         item = proto_tree_add_uint_format_value(
-                            mptcp_tree, hf_mptcp_seg_dsn_end, tvb, offset,  
+                            mptcp_tree, hf_mptcp_seg_dsn_end, tvb, offset,
                             );
-                        
+
                         PROTO_ITEM_SET_GENERATED(item);
-                        
+
                         /* now if this is the first time, we need to register it */
-                        if (!PINFO_FD_VISITED(pinfo)) 
+                        if (!PINFO_FD_VISITED(pinfo))
                         {
                             mptcp_dsn2packet_mapping_t *packet;
                             packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
-                            packet->dsn_range.low = 
-                            packet->dsn_range.high = 
-                            packet->dsn_range.max_edge = 
+                            packet->dsn_range.low =
+                            packet->dsn_range.high =
+                            packet->dsn_range.max_edge =
                         }
                     }
 
-                    
-//            
+
+//
                     /* register the mapping dsn <-> data into the meta */
-//                    if (!PINFO_FD_VISITED(pinfo)) 
+//                    if (!PINFO_FD_VISITED(pinfo))
 //                    {
 
                     /* todo check if this returns several results or not */
 
                     /* look for additionnal information from other subflows */
-                    
+
                 }
-                
+
                 if ((int)optlen >= offset-start_offset+4)
                 {
                     proto_tree_add_item(mptcp_tree,
@@ -6598,7 +6598,7 @@ proto_register_tcp(void)
             "This frame has some of the MPTCP analysis shown", HFILL }},
 
         { &hf_mptcp_analysis_mapping,
-            { "DSS mapping analysis",   "mptcp.analysis.mapping", FT_NONE, BASE_NONE, NULL, 0x0,
+          { "DSS mapping analysis",   "mptcp.analysis.mapping", FT_NONE, BASE_NONE, NULL, 0x0,
             "This frame has some of the MPTCP analysis shown", HFILL }},
 
         { &hf_mptcp_seg_dsn_start,

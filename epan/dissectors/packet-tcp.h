@@ -177,22 +177,22 @@ struct tcp_multisegment_pdu {
 typedef struct _mptcp_dsn2packet_mapping_t {
 
 /* use offsetof to retrieve mapping from registered range */
-wmem_range_t dsn_range; 
+wmem_range_t dsn_range;
 
 /* additionnal fields */
 //guint64 dsn;    /* */
 guint32 frame;  /* packet to look into PINFO_FD_NUM */
 struct tcp_analysis* subflow;   /* in order to get statistics */
-} mptcp_dss_mapping_t;
+} _mptcp_dsn2packet_mapping_t;
 
 
-/* Represents the MPTCP DSS option mapping part 
+/* Represents the MPTCP DSS option mapping part
  It allows to map subflow sequence number to global MPTCP sequence numbers
 */
 typedef struct _mptcp_dss_mapping_t {
 
 /* SSN range use offsetof to retrieve mapping from registered range */
-wmem_range_t ssn_range; 
+wmem_range_t ssn_range;
 
 /* additionnal fields */
 guint64 dsn;    /* matches the low member of range */

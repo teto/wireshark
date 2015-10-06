@@ -104,6 +104,8 @@ wmem_tree_is_empty(wmem_tree_t *tree);
  * Data is a pointer to the structure you want to be able to retrieve by
  * searching for the same key later.
  *
+ * Returns a pointer to the data
+ *
  * NOTE: If you insert a node to a key that already exists in the tree this
  * function will simply overwrite the old value. If the structures you are
  * storing are allocated in a wmem pool this is not a problem as they will still
@@ -225,11 +227,11 @@ wmem_tree_lookup32_array_le(wmem_tree_t *tree, wmem_tree_key_t *key);
 /** Function type for processing one node of a tree during a traversal. Value is
  * the value of the node, userdata is whatever was passed to the traversal
  * function. If the function returns TRUE the traversal will end prematurely.
- 
+
  */
 typedef gboolean (*wmem_foreach_func)(void *value, void *userdata);
 
-/* HACK MATT : value est le wmem_tree_node_t et n,on plus la valeur 
+/* HACK MATT : value est le wmem_tree_node_t et n,on plus la valeur
 besoin d'une nouvelle fct sinon ca va casser le reste du code
 */
 /* wmem_tree_node_t */
@@ -253,7 +255,7 @@ wmem_tree_foreach_matt(wmem_tree_t* tree, wmem_foreach_func callback,
 //gboolean
 //wmem_tree_foreach_nodes(wmem_tree_node_t* node, wmem_foreach_func callback,
 //        void *user_data);
-        
+
 /** Prints the structure of the tree to stdout. Primarily for debugging. */
 void
 wmem_print_tree(wmem_tree_t *tree);
