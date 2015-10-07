@@ -70,6 +70,20 @@ struct _wmem_tree_node_t {
 
 typedef struct _wmem_tree_node_t wmem_tree_node_t;
 
+
+struct _wmem_tree_t {
+    wmem_allocator_t *master;
+    wmem_allocator_t *allocator;
+    wmem_tree_node_t *root;
+    guint             master_cb_id;
+    guint             slave_cb_id;
+
+// see it as an augmented tree
+// TODO here we can add a few callbacks, to display the tree for instance
+//    wmem_foreach_func display_cb;
+//    wmem_foreach_func display_cb;
+};
+
 /** Creates a tree with the given allocator scope. When the scope is emptied,
  * the tree is fully destroyed. */
 WS_DLL_PUBLIC

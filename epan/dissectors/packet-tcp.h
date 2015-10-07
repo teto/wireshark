@@ -193,14 +193,19 @@ struct tcp_analysis* subflow;   /* in order to get statistics */
 */
 typedef struct _mptcp_dss_mapping_t {
 
-/* SSN range use offsetof to retrieve mapping from registered range */
+/* SSN range use offsetof to retrieve mapping from registered range
+ In DSS, SSN are enumeratad with relative seq_nb, i.e. starting from one
+*/
+
 wmem_range_t ssn_range;
 
 /* additionnal fields */
 guint64 dsn;    /* matches the low member of range
                 TODO precise if it is a raw DSN
                 */
-guint32 frame;  /* set with PINFO_FD_NUM */
+/* set with PINFO_FD_NUM. Allow to check if mapping was sent before or after packet
+*/
+guint32 frame;
 } mptcp_dss_mapping_t;
 /*
 TODO the mapping should also say from which stream it was discovered

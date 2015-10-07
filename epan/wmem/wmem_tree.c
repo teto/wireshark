@@ -33,18 +33,6 @@
 #include "wmem_tree.h"
 #include "wmem_user_cb.h"
 
-struct _wmem_tree_t {
-    wmem_allocator_t *master;
-    wmem_allocator_t *allocator;
-    wmem_tree_node_t *root;
-    guint             master_cb_id;
-    guint             slave_cb_id;
-
-// see it as an augmented tree
-// TODO here we can add a few callbacks, to display the tree for instance
-//    wmem_foreach_func display_cb;
-//    wmem_foreach_func display_cb;
-};
 
 typedef int (*compare_func)(const void *a, const void *b);
 

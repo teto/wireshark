@@ -49,7 +49,7 @@ print_range(void *value, void* userData _U_)
 gboolean
 do_range_overlap(wmem_range_t *r1, wmem_range_t *r2)
 {
-    if (r1->low <= r2->high || r2->low <= r1->high)
+    if (r1->low <= r2->high && r2->low <= r1->high)
         return TRUE;
 
     return FALSE;
@@ -143,6 +143,8 @@ wmem_itree_insert(wmem_itree_t *tree, wmem_range_t *range)
     // TODO should update the maxedge accordingly
 //
     // Returns a pointer to the range
+    printf("Inserting range\n");
+    print_range(range, 0);
     g_assert(range->low < range->high);
     range->max_edge = range->high;
      wmem_tree_node_t *node = wmem_tree_insert32_matt(tree, range->low, range);
@@ -217,21 +219,60 @@ Interval *overlapSearch(ITNode *root, Interval i)
 //    // need to scheme through it manually
 //}
 
-
-void
-wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t interval, wmem_range_t *results)
+static void
+wmem_itree_find_interval_in_subtree(wmem_tree_node_t *node, wmem_range_t requested, wmem_range_t **results)
 {
+    wmem_range_t* current;
+
+    if(!node) {
+        return;
+    }
+    current = (wmem_range_t*)node->data;
+
+    if(requested.low > current->max_edge) {
+        return;
+    }
+
+    if(do_range_overlap(current, &requested)) {
+        printf("Found a match");
+        print_range(current, 0);
+        *results = current;
+        return;
+    }
+
+//    if(root->left) {
+    wmem_itree_find_interval_in_subtree(node->left, requested, results);
+    wmem_itree_find_interval_in_subtree(node->right, requested, results);
+//    }
+}
+
+// TODO lui passer une GSlist comme results
+void
+wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t requested, wmem_range_t **results)
+{
+    printf("Requesting interval: ");
+    print_range(&requested, 0);
+    printf("\n");
+
 //    interval
     /* TODO */
+    if(wmem_tree_is_empty(tree))
+        return ;
+
+    wmem_itree_find_interval_in_subtree(tree->root, requested, results);
+
+
 }
 
 void
-wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t *results)
+wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t **results)
 {
     // construit un range de 1,1
-//    wmem_range_t fakeRange;
-//
-//    wmem_itree_find_interval()
+    wmem_range_t fakeRange;
+    fakeRange.low  = point;
+    fakeRange.high = point;
+
+    wmem_itree_find_interval(tree, fakeRange, results);
 }
 
 void

@@ -78,7 +78,7 @@ TODO pass as results parameters a GSList, for now deal with a simple case, only 
 */
 WS_DLL_PUBLIC
 void
-wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t interval, wmem_range_t *results);
+wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t interval, wmem_range_t **results);
 
 
 /*
@@ -86,7 +86,7 @@ Save results in
 */
 WS_DLL_PUBLIC
 void
-wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t *results);
+wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t **results);
 
 /**
  * Print ranges along the tree

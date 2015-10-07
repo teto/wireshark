@@ -276,6 +276,7 @@ static int hf_mptcp_analysis_subflows_stream_id = -1;
 static int hf_mptcp_analysis_subflows = -1;
 static int hf_mptcp_seg_dsn_start = -1;
 static int hf_mptcp_seg_dsn_end = -1;
+static int hf_mptcp_application_latency = -1;
 
 static int hf_tcp_option_fast_open = -1;
 static int hf_tcp_option_fast_open_cookie_request = -1;
@@ -381,12 +382,13 @@ static expert_field ei_tcp_checksum_ffff = EI_INIT;
 static expert_field ei_tcp_checksum_bad = EI_INIT;
 static expert_field ei_tcp_urgent_pointer_non_zero = EI_INIT;
 static expert_field ei_tcp_suboption_malformed = EI_INIT;
-static expert_field ei_mptcp_analysis_unexpected_idsn = EI_INIT;
 
+static expert_field ei_mptcp_analysis_unexpected_idsn = EI_INIT;
 static expert_field ei_mptcp_analysis_echoed_key_mismatch = EI_INIT;
 static expert_field ei_mptcp_analysis_missing_algorithm = EI_INIT;
 static expert_field ei_mptcp_analysis_unsupported_algorithm = EI_INIT;
 static expert_field ei_mptcp_mapping_missing = EI_INIT;
+static expert_field ei_mptcp_stream_incomplete = EI_INIT;
 
 /* Some protocols such as encrypted DCE/RPCoverHTTP have dependencies
  * from one PDU to the next PDU and require that they are called in sequence.
@@ -1972,6 +1974,17 @@ mptcp_map_ssn_to_dsn(mptcp_dss_mapping_t *mapping, guint32 ssn, guint64 *dsn)
     return TRUE;
 }
 
+// TODO remove, use for debug
+static void
+mptcp_print_mapping(mptcp_dss_mapping_t *mapping)
+{
+    printf("Mapping DSN %lu to SSN %u-%u (found in frame %u)\n",
+        mapping->dsn,
+        mapping->ssn_range.low,
+        mapping->ssn_range.high,
+        mapping->frame
+        );
+}
 
 /* Print subflow list */
 static void
@@ -2015,8 +2028,10 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
 
     mptcp_analysis_add_subflows(pinfo, tvb, tree, mptcpd);
 
-    /* if mapping analysis enabled */
-    if(mptcp_analyze_mappings)
+    /* if mapping analysis enabled
+    TODO and search only if th_seglen > 0
+    */
+    if(mptcp_analyze_mappings && tcph->th_seglen)
     {
         int offset = 0;
 //                    GSlist *results = NULL;
@@ -2026,10 +2041,10 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
 
         /* retrieve all mappings that cover this packet */
         requested_ssn_range.low = tcph->th_seq;
-        requested_ssn_range.high = tcph->th_seq + tcph->th_seglen;
-        requested_ssn_range.max_edge = 0;
+        requested_ssn_range.high = tcph->th_seq + tcph->th_seglen - 1;
+//        requested_ssn_range.max_edge = 0;
 
-        wmem_itree_find_interval(tcpd->fwd->mptcp_subflow->mappings, requested_ssn_range, results);
+        wmem_itree_find_interval(tcpd->fwd->mptcp_subflow->mappings, requested_ssn_range, &results);
 
         if(!results) {
             // TODO use add format to add ssns
@@ -2039,14 +2054,20 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
 
             guint64 dsn_low = 0;
             guint64 dsn_high = 0;
+            gboolean error = FALSE;
 
             //mptcp_map_ssn_to_dsn
             /* results should be some kind of GSList in case 2 DSS are needed to cover this packet */
             /* display in */
             mapping =  (mptcp_dss_mapping_t *) (results - offsetof(mptcp_dss_mapping_t, ssn_range));
 
+            mptcp_print_mapping(mapping);
+
             if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq, &dsn_low)) {
-                item = proto_tree_add_uint_format_value(
+
+                /* TODO add the ability to display it relatively */
+                printf("DSN_LOW \n");
+                item = proto_tree_add_uint64_format_value(
                     tree, hf_mptcp_seg_dsn_start, tvb, offset, 0, dsn_low,
                     "%" G_GINT64_MODIFIER "u (64bits)", dsn_low
                      );
@@ -2055,10 +2076,13 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
             else {
                 proto_tree_add_text(tree, tvb, offset, 0,
                 "Failed to map ssn %u", tcph->th_seq);
+                error = TRUE;
             }
 
-            if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq + tcph->th_seglen, &dsn_high) ) {
-                item = proto_tree_add_uint_format_value(
+            if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq + tcph->th_seglen - 1, &dsn_high) ) {
+
+                printf("DSN_HIGH \n");
+                item = proto_tree_add_uint64_format_value(
                     tree, hf_mptcp_seg_dsn_end, tvb, offset, 0,
                     dsn_high,
                     "%" G_GINT64_MODIFIER "u (64bits)", dsn_high
@@ -2067,26 +2091,58 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
             }
             else {
                 proto_tree_add_text(tree, tvb, offset, 0,
-                "Failed to map ssn %u", tcph->th_seq);
+                "Failed to map ssn %u", tcph->th_seq+ tcph->th_seglen- 1);
+                error = TRUE;
             }
 
 
 
 
-            /* now if this is the first time, we need to register it */
-            if (!PINFO_FD_VISITED(pinfo))
-            {
-                mptcp_dsn2packet_mapping_t *packet;
-                packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
-                /* TODO translate low/high from ssn to dsn thanks to the mapping */
-                packet->dsn_range.low =
-                packet->dsn_range.high =
-                packet->dsn_range.max_edge = 0;
+            /* now if this is the first time and we have been able to map dsn_low and dsn_high,
+              we need to register it
+             */
+            if(!error) {
 
-                /* */
-                wmem_itree_insert(tcpd->fwd->mptcp_subflow->meta->dsn_map, &packet->dsn_range);
+                wmem_range_t request;
+//                wmem_range_t* results = NULL;
+                /* look in the meta for duplicate or retransmissions of the range dsn_low dsn_high */
+                request.low = (guint32)dsn_low;
+                request.high = (guint32)dsn_high;
+
+                if (!PINFO_FD_VISITED(pinfo) )
+                {
+                    mptcp_dsn2packet_mapping_t *packet;
+                    packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
+                    /* TODO translate low/high from ssn to dsn thanks to the mapping */
+//                    packet->dsn_range.low = (guint32)dsn_low;
+//                    packet->dsn_range.high = (guint32)dsn_high;
+                    packet->dsn_range = request;
+                    packet->frame = PINFO_FD_NUM(pinfo);
+                    packet->subflow = tcpd;
+                    /* */
+                    wmem_itree_insert(tcpd->fwd->mptcp_subflow->meta->dsn_map, &packet->dsn_range);
+                }
+
+                /* look for the packet with the DSN just before dsn_low and display the elapsed time between the 2
+                  compare with base_dsn
+                */
+
+                /* Now I send a request to compute the application latency between this dsn and the previous one */
+                wmem_itree_find_point(tcpd->fwd->mptcp_subflow->meta->dsn_map, dsn_low-1, &results );
+
+                if(!results) {
+                    expert_add_info(pinfo, tree, &ei_mptcp_stream_incomplete);
+                }
+                else {
+                    mptcp_dsn2packet_mapping_t *map = NULL;
+                    map =  (mptcp_dsn2packet_mapping_t *) (results - offsetof(mptcp_dsn2packet_mapping_t, dsn_range));
+
+                    // TODO afficher le decalage de temps entre les 2 paquets/emissions
+                    // en comparant les temps des 2 frames !!
+                    //
+
+                }
             }
-
 
         }
 
@@ -6619,6 +6675,7 @@ proto_register_tcp(void)
         { &ei_mptcp_analysis_missing_algorithm, { "mptcp.analysis.missing_algorithm", PI_PROTOCOL, PI_WARN, "No crypto algorithm specified", EXPFILL }},
         { &ei_mptcp_analysis_unsupported_algorithm, { "mptcp.analysis.unsupported_algorithm", PI_PROTOCOL, PI_WARN, "Unsupported algorithm", EXPFILL }},
         { &ei_mptcp_mapping_missing, { "mptcp.dss.missing_mapping", PI_PROTOCOL, PI_WARN, "No mapping available", EXPFILL }},
+        { &ei_mptcp_stream_incomplete, { "mptcp.incomplete", PI_PROTOCOL, PI_WARN, "Everything was not captured", EXPFILL }},
     };
 
     static hf_register_info mptcp_hf[] = {
@@ -6657,6 +6714,12 @@ proto_register_tcp(void)
         { &hf_mptcp_seg_dsn_end,
           { "Segment Data Sequence Number end", "mptcp.dsn_end", FT_UINT64,
             BASE_DEC, NULL, 0x0, NULL, HFILL}},
+
+        // FT_FRAMENUM
+        { &hf_mptcp_application_latency,
+          { "Application latency", "mptcp.app_latency", FT_RELATIVE_TIME,
+            BASE_DEC, NULL, 0x0,
+            "Gives the elapsed time between the head DSN of this packet and the packet transporting DSN-1", HFILL}},
 
         { &hf_mptcp_analysis_subflows,
           { "TCP subflow stream id(s):",   "mptcp.analysis.subflows", FT_NONE, BASE_NONE, NULL, 0x0,
