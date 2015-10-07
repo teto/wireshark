@@ -35,6 +35,17 @@
 #include "wmem_user_cb.h"
 
 
+
+static gboolean
+print_range(void *value, void* userData _U_)
+{
+    wmem_range_t *range = (wmem_range_t *)value;
+    printf("Range: low=%u high=%u max_edge=%u", range->low, range->high, range->max_edge);
+//    printf("Data: %p\n", range->data);
+    return TRUE;
+}
+
+
 gboolean
 do_range_overlap(wmem_range_t *r1, wmem_range_t *r2)
 {
@@ -52,37 +63,57 @@ wmem_itree_new(wmem_allocator_t *allocator)
 
 /*
 probleme c que la on regarde d'abord les enfants gacuhe, soit mm puis les enfantsz de droite
+regarder d'abord soit puis update le parent en cas de rotation ?
 */
-gboolean
-update_maximum(void *value, void *userdata _U_)
+static void
+update_maximum(wmem_tree_node_t *node)
 {
-    wmem_tree_node_t *node = (wmem_tree_node_t *) value;
-    wmem_range_t *range = (wmem_range_t *)node->data;
+//    wmem_tree_node_t *node = (wmem_tree_node_t *) value;
+    wmem_range_t *range;
 
-    wmem_range_t *range_l = (node->left) ? (wmem_range_t *)node->left->data : NULL;
-    wmem_range_t *range_r = (node->right) ? (wmem_range_t *)node->right->data : NULL;
+    if(!node) {
+        return ;
+    }
 
-    guint32 maxEdge = range->max_edge;
+    range = (wmem_range_t *)node->data;
+
+
+    printf("Updating maximum\n");
+    print_range(range, 0);
+
+    wmem_range_t *range_l = (node->left) ? (wmem_range_t *) (node->left->data) : NULL;
+    wmem_range_t *range_r = (node->right) ? (wmem_range_t *) (node->right->data) : NULL;
+
+    guint32 maxEdge = range->high;
 
     // TODO assigner le max entre ses enfants et son high
     // Pointeur vers la data, remonter a la racine
 //    if(maxEdge < range->high) {
         /* may need to update here */
-        maxEdge = MAX(maxEdge, range->high) ;
+//    maxEdge = MAX(maxEdge, ) ;
 //    }
 
-    if(range_r && range_r->max_edge > maxEdge) {
+    //&& range_r->max_edge > maxEdge
+    if(range_r) {
         maxEdge = MAX(maxEdge, range_r->max_edge) ;
     }
-    if(range_l && range_l->max_edge > maxEdge) {
+    //&& range_l->max_edge > maxEdge
+    if(range_l) {
         maxEdge = MAX(maxEdge, range_l->max_edge) ;
     }
 
     range->max_edge = maxEdge;
 
-    return FALSE;
+    if(node->parent && node->parent->left != node) {
+    // in case of rotation
+        update_maximum(node->parent->left);
+
+    }
+    update_maximum(node->parent);
+//    return FALSE;
 }
 
+#if 0
 // Update the maxima once the tree is built
 void
 wmem_itree_update_maxima(wmem_itree_t *tree)
@@ -99,6 +130,7 @@ wmem_itree_update_maxima(wmem_itree_t *tree)
 //    wmem_tree_foreach_nodes
     result = wmem_tree_foreach_matt(tree, &update_maximum, NULL);
 }
+#endif
 
 // Penser a maj le max edge
 // For tests suppose in a first attempt that Sequence numbers are coded on 32bits
@@ -109,12 +141,17 @@ void
 wmem_itree_insert(wmem_itree_t *tree, wmem_range_t *range)
 {
     // TODO should update the maxedge accordingly
-//    wmem_tree_node_t *node =
+//
     // Returns a pointer to the range
-    wmem_tree_insert32(tree, range->low, range);
+    g_assert(range->low < range->high);
+    range->max_edge = range->high;
+     wmem_tree_node_t *node = wmem_tree_insert32_matt(tree, range->low, range);
 
+//    if()
+    update_maximum(node);
     // Not efficient at all but ok for testing I suppose ?
-    wmem_itree_update_maxima(tree);
+    // TODO pass the node
+//    wmem_itree_update_maxima(tree);
 //    wmem_range_t * rootRange = (wmem_range_t *)tree->root->data;
 //    node
 
@@ -182,14 +219,10 @@ Interval *overlapSearch(ITNode *root, Interval i)
 
 
 void
-print_range(void *value, void* userData)
-{
-    printf("custom printf: %p", value);
-}
-void
 wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t interval, wmem_range_t *results)
 {
 //    interval
+    /* TODO */
 }
 
 void
@@ -200,3 +233,16 @@ wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t *results)
 //
 //    wmem_itree_find_interval()
 }
+
+void
+wmem_print_itree(wmem_tree_t *tree)
+{
+    wmem_print_tree_with_values(tree, &print_range);
+}
+
+
+//wmem_print_tree
+//()
+//static void
+//wmem_itree_print(const char *prefix, wmem_tree_node_t *node, guint32 level, wmem_foreach_func callback)
+//{

@@ -116,6 +116,15 @@ WS_DLL_PUBLIC
 void *
 wmem_tree_insert32(wmem_tree_t *tree, guint32 key, void *data);
 
+WS_DLL_PUBLIC
+wmem_tree_node_t *
+wmem_tree_insert32_matt(wmem_tree_t *tree, guint32 key, void *data);
+
+//WS_DLL_PUBLIC
+//wmem_tree_node_t *
+//lookup_or_insert32_matt(wmem_tree_t *tree, guint32 key,
+//        void*(*func)(void*), void* data, gboolean is_subtree, gboolean replace);
+
 /** Look up a node in the tree indexed by a guint32 integer value. If no node is
  * found the function will return NULL.
  */

@@ -174,6 +174,8 @@ struct tcp_multisegment_pdu {
 };
 
 
+/* Structure used in mptcp meta member 'dsn_map'
+ */
 typedef struct _mptcp_dsn2packet_mapping_t {
 
 /* use offsetof to retrieve mapping from registered range */
@@ -183,7 +185,7 @@ wmem_range_t dsn_range;
 //guint64 dsn;    /* */
 guint32 frame;  /* packet to look into PINFO_FD_NUM */
 struct tcp_analysis* subflow;   /* in order to get statistics */
-} _mptcp_dsn2packet_mapping_t;
+} mptcp_dsn2packet_mapping_t;
 
 
 /* Represents the MPTCP DSS option mapping part
@@ -195,7 +197,9 @@ typedef struct _mptcp_dss_mapping_t {
 wmem_range_t ssn_range;
 
 /* additionnal fields */
-guint64 dsn;    /* matches the low member of range */
+guint64 dsn;    /* matches the low member of range
+                TODO precise if it is a raw DSN
+                */
 guint32 frame;  /* set with PINFO_FD_NUM */
 } mptcp_dss_mapping_t;
 /*
@@ -231,7 +235,10 @@ typedef struct _mptcp_meta_flow_t {
 
 	guint32 fin;		/* frame number of the final dataFIN */
 
-	wmem_itree_t *dsn_map;  /* Maps DSN to packets */
+	/* Attempt to map DSN to packets
+	 * Ideally this should help
+	 */
+	wmem_itree_t *dsn_map;
 } mptcp_meta_flow_t;
 
 /* MPTCP data specific to this subflow direction */

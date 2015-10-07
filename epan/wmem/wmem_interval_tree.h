@@ -38,6 +38,8 @@ extern "C" {
  *http://www.geeksforgeeks.org/interval-tree/
  * The idea is to augment a self-balancing Binary Search Tree (BST) like Red Black Tree, AVL Tree, etc to maintain set of intervals so that all operations can be done in O(Logn) tim
  *    @{
+ * Following wikipedia's convention this is an augmented tree rather then an interval tree
+ * http://www.wikiwand.com/en/Interval_tree
  */
 
 struct _wmem_tree_t;
@@ -70,8 +72,8 @@ WS_DLL_PUBLIC
 void
 wmem_itree_update_maxima(wmem_itree_t *tree);
 
-/* 
-Save results in 
+/*
+Save results in
 TODO pass as results parameters a GSList, for now deal with a simple case, only one result
 */
 WS_DLL_PUBLIC
@@ -79,13 +81,19 @@ void
 wmem_itree_find_interval(wmem_itree_t *tree, wmem_range_t interval, wmem_range_t *results);
 
 
-/* 
-Save results in 
+/*
+Save results in
 */
 WS_DLL_PUBLIC
 void
 wmem_itree_find_point(wmem_itree_t *tree, guint32 point, wmem_range_t *results);
 
+/**
+ * Print ranges along the tree
+ */
+WS_DLL_PUBLIC
+void
+wmem_print_itree(wmem_itree_t *tree);
 
 #ifdef __cplusplus
 }

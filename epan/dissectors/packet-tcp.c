@@ -759,7 +759,7 @@ static gboolean tcp_track_bytes_in_flight = TRUE;
 static gboolean tcp_calculate_ts          = FALSE;
 
 static gboolean tcp_analyze_mptcp         = TRUE;
-static gboolean mptcp_analyze_mappings = FALSE;
+static gboolean mptcp_analyze_mappings    = FALSE;
 
 
 #define TCP_A_RETRANSMISSION          0x0001
@@ -876,6 +876,7 @@ mptcp_init_subflow(tcp_flow_t *flow)
 
     DISSECTOR_ASSERT(flow->mptcp_subflow == 0);
     flow->mptcp_subflow = sf;
+    sf->mappings = wmem_itree_new(wmem_file_scope());
 }
 
 
@@ -1956,6 +1957,22 @@ mptcp_analysis_add_subflows(packet_info *pinfo _U_,  tvbuff_t *tvb,
     PROTO_ITEM_SET_GENERATED(item);
 }
 
+/*
+Accepts only raw numbers
+*/
+static
+gboolean
+mptcp_map_ssn_to_dsn(mptcp_dss_mapping_t *mapping, guint32 ssn, guint64 *dsn)
+{
+    if( (ssn < mapping->ssn_range.low) || (ssn > mapping->ssn_range.high)) {
+        return FALSE;
+    }
+
+    *dsn = mapping->dsn + ( ssn - mapping->ssn_range.low);
+    return TRUE;
+}
+
+
 /* Print subflow list */
 static void
 mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent_tree,
@@ -1997,6 +2014,91 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
         return ;
 
     mptcp_analysis_add_subflows(pinfo, tvb, tree, mptcpd);
+
+    /* if mapping analysis enabled */
+    if(mptcp_analyze_mappings)
+    {
+        int offset = 0;
+//                    GSlist *results = NULL;
+        mptcp_dss_mapping_t *mapping = NULL;
+        wmem_range_t *results = NULL;
+        wmem_range_t requested_ssn_range;
+
+        /* retrieve all mappings that cover this packet */
+        requested_ssn_range.low = tcph->th_seq;
+        requested_ssn_range.high = tcph->th_seq + tcph->th_seglen;
+        requested_ssn_range.max_edge = 0;
+
+        wmem_itree_find_interval(tcpd->fwd->mptcp_subflow->mappings, requested_ssn_range, results);
+
+        if(!results) {
+            // TODO use add format to add ssns
+            expert_add_info(pinfo, item, &ei_mptcp_mapping_missing);
+        }
+        else {
+
+            guint64 dsn_low = 0;
+            guint64 dsn_high = 0;
+
+            //mptcp_map_ssn_to_dsn
+            /* results should be some kind of GSList in case 2 DSS are needed to cover this packet */
+            /* display in */
+            mapping =  (mptcp_dss_mapping_t *) (results - offsetof(mptcp_dss_mapping_t, ssn_range));
+
+            if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq, &dsn_low)) {
+                item = proto_tree_add_uint_format_value(
+                    tree, hf_mptcp_seg_dsn_start, tvb, offset, 0, dsn_low,
+                    "%" G_GINT64_MODIFIER "u (64bits)", dsn_low
+                     );
+                PROTO_ITEM_SET_GENERATED(item);
+            }
+            else {
+                proto_tree_add_text(tree, tvb, offset, 0,
+                "Failed to map ssn %u", tcph->th_seq);
+            }
+
+            if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq + tcph->th_seglen, &dsn_high) ) {
+                item = proto_tree_add_uint_format_value(
+                    tree, hf_mptcp_seg_dsn_end, tvb, offset, 0,
+                    dsn_high,
+                    "%" G_GINT64_MODIFIER "u (64bits)", dsn_high
+                    );
+                PROTO_ITEM_SET_GENERATED(item);
+            }
+            else {
+                proto_tree_add_text(tree, tvb, offset, 0,
+                "Failed to map ssn %u", tcph->th_seq);
+            }
+
+
+
+
+            /* now if this is the first time, we need to register it */
+            if (!PINFO_FD_VISITED(pinfo))
+            {
+                mptcp_dsn2packet_mapping_t *packet;
+                packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
+                /* TODO translate low/high from ssn to dsn thanks to the mapping */
+                packet->dsn_range.low =
+                packet->dsn_range.high =
+                packet->dsn_range.max_edge = 0;
+
+                /* */
+                wmem_itree_insert(tcpd->fwd->mptcp_subflow->meta->dsn_map, &packet->dsn_range);
+            }
+
+
+        }
+
+        /* register the mapping dsn <-> data into the meta */
+//                    if (!PINFO_FD_VISITED(pinfo))
+//                    {
+
+        /* todo check if this returns several results or not */
+
+        /* look for additionnal information from other subflows */
+
+    }
 }
 
 
@@ -3199,12 +3301,6 @@ get_or_create_mptcpd_from_key(struct tcp_analysis* tcpd, tcp_flow_t *fwd, guint6
 
 
 
-static
-gboolean
-mptcp_map_ssn_to_dsn()
-{
-
-}
 
 /*
  * The TCP Extensions for Multipath Operation with Multiple Addresses
@@ -3448,7 +3544,6 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
             if (mph->mh_dss_flags & MPTCP_DSS_FLAG_MAPPING_PRESENT) {
 
                 guint64 dsn;
-                mptcp_mapping_t *mapping = NULL;
 
                 if (mph->mh_dss_flags & MPTCP_DSS_FLAG_DSN_8BYTES) {
 
@@ -3489,76 +3584,30 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                 /* if mapping analysis enabled */
                 if(mptcp_analyze_mappings)
                 {
-//                    GSlist *results = NULL;
-                    wmem_range_t *results = NULL;
-                    wmem_range_t requested_ssn_range;
 
                     if (!PINFO_FD_VISITED(pinfo))
                     {
                         /* register SSN range described by the mapping into a subflow interval_tree
                         */
-                        mapping = wmem_new0(wmem_file_scope(), mptcp_mapping_t);
+                        mptcp_dss_mapping_t *mapping = NULL;
+                        mapping = wmem_new0(wmem_file_scope(), mptcp_dss_mapping_t);
 
                         mapping->ssn_range.max_edge = 0;
                         mapping->dsn  = mph->mh_rawdsn;
                         mapping->frame = PINFO_FD_NUM(pinfo);
 
-//                        wmem_tree_insert32(tcpd->fwd->mptcp_subflow, mph->mh_ssn, mapping);
-                        wmem_itree_insert(tcpd->fwd->mptcp_subflow->mappings, &mapping->ssn_range);
-
                         mapping->ssn_range.low  = mph->mh_ssn;
                         mapping->ssn_range.high = mph->mh_ssn + mph->mh_length-1;
+
+//                        wmem_tree_insert32(tcpd->fwd->mptcp_subflow, mph->mh_ssn, mapping);
+                        wmem_itree_insert(tcpd->fwd->mptcp_subflow->mappings, &mapping->ssn_range);
+                        printf("Just registered SSN mapping %u-%u to dsn %lu\n",
+                                mapping->ssn_range.low,
+                                mapping->ssn_range.high,
+                                mapping->dsn
+                                );
+                        wmem_print_itree(tcpd->fwd->mptcp_subflow->mappings);
                     }
-
-                    /* retrieve all mappings that cover this packet */
-                    requested_ssn_range.low = tcph->th_seq;
-                    requested_ssn_range.high = tcph->th_seq + tcph->th_seglen;
-                    requested_ssn_range.max_edge = 0;
-
-                    wmem_itree_find_interval(tcpd->fwd->mptcp_subflow->mappings, requested_ssn_range, results);
-
-                    if(!results) {
-                        // TODO use add format to add ssns
-                        expert_add_info(pinfo, item, &ei_mptcp_mapping_missing);
-                    }
-                    else {
-                        //mptcp_map_ssn_to_dsn
-                        /* results should be some kind of GSList in case 2 DSS are needed to cover this packet */
-                        /* display in */
-                        mapping =  (mptcp_mapping_t *) (results - offsetof(mptcp_mapping_t, ssn_range));
-
-                        item = proto_tree_add_uint_format_value(
-                            mptcp_tree, hf_mptcp_seg_dsn_start, tvb, offset,
-                            );
-                        PROTO_ITEM_SET_GENERATED(item);
-
-                        item = proto_tree_add_uint_format_value(
-                            mptcp_tree, hf_mptcp_seg_dsn_end, tvb, offset,
-                            );
-
-                        PROTO_ITEM_SET_GENERATED(item);
-
-                        /* now if this is the first time, we need to register it */
-                        if (!PINFO_FD_VISITED(pinfo))
-                        {
-                            mptcp_dsn2packet_mapping_t *packet;
-                            packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
-                            packet->dsn_range.low =
-                            packet->dsn_range.high =
-                            packet->dsn_range.max_edge =
-                        }
-                    }
-
-
-//
-                    /* register the mapping dsn <-> data into the meta */
-//                    if (!PINFO_FD_VISITED(pinfo))
-//                    {
-
-                    /* todo check if this returns several results or not */
-
-                    /* look for additionnal information from other subflows */
-
                 }
 
                 if ((int)optlen >= offset-start_offset+4)

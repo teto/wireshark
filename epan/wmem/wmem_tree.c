@@ -295,8 +295,13 @@ create_node(wmem_allocator_t *allocator, wmem_tree_node_t *parent, const void *k
 }
 
 #define CREATE_DATA(TRANSFORM, DATA) ((TRANSFORM) ? (TRANSFORM)(DATA) : (DATA))
-static void *
-lookup_or_insert32(wmem_tree_t *tree, guint32 key,
+
+/**
+ * return inserted node
+ TODO remake static again
+ */
+wmem_tree_node_t *
+lookup_or_insert32_matt(wmem_tree_t *tree, guint32 key,
         void*(*func)(void*), void* data, gboolean is_subtree, gboolean replace)
 {
     wmem_tree_node_t *node     = tree->root;
@@ -307,7 +312,7 @@ lookup_or_insert32(wmem_tree_t *tree, guint32 key,
         new_node = create_node(tree->allocator, NULL, GUINT_TO_POINTER(key),
                 CREATE_DATA(func, data), WMEM_NODE_COLOR_BLACK, is_subtree);
         tree->root = new_node;
-        return new_node->data;
+        return new_node;
     }
 
     /* it was not the new root so walk the tree until we find where to
@@ -319,7 +324,7 @@ lookup_or_insert32(wmem_tree_t *tree, guint32 key,
             if (replace) {
                 node->data = CREATE_DATA(func, data);
             }
-            return node->data;
+            return node;
         }
         else if (key < GPOINTER_TO_UINT(node->key)) {
             if (node->left) {
@@ -350,8 +355,10 @@ lookup_or_insert32(wmem_tree_t *tree, guint32 key,
     /* node will now point to the newly created node */
     rb_insert_case1(tree, new_node);
 
-    return new_node->data;
+    return new_node;
 }
+
+
 
 static void *
 wmem_tree_lookup(wmem_tree_t *tree, const void *key, compare_func cmp)
@@ -431,9 +438,24 @@ wmem_tree_insert(wmem_tree_t *tree, const void *key, void *data, compare_func cm
 }
 
 void *
+lookup_or_insert32(wmem_tree_t *tree, guint32 key,
+        void*(*func)(void*), void* data, gboolean is_subtree, gboolean replace)
+{
+    wmem_tree_node_t *node = lookup_or_insert32_matt(tree, key, func, data, is_subtree, replace);
+
+    return node->data;
+}
+
+void *
 wmem_tree_insert32(wmem_tree_t *tree, guint32 key, void *data)
 {
     return lookup_or_insert32(tree, key, NULL, data, FALSE, TRUE);
+}
+
+wmem_tree_node_t *
+wmem_tree_insert32_matt(wmem_tree_t *tree, guint32 key, void *data)
+{
+    return lookup_or_insert32_matt(tree, key, NULL, data, FALSE, TRUE);
 }
 
 void *
