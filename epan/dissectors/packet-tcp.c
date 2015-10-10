@@ -44,11 +44,13 @@
 #include "packet-tcp.h"
 #include "packet-ip.h"
 #include "packet-icmp.h"
+#include "frame_data_sequence.h"
 
 void proto_register_tcp(void);
 void proto_reg_handoff_tcp(void);
 
 static int tcp_tap = -1;
+static int mptcp_tap = -1;
 
 /* Place TCP summary in proto tree */
 static gboolean tcp_summary_in_tree = TRUE;
@@ -389,6 +391,7 @@ static expert_field ei_mptcp_analysis_missing_algorithm = EI_INIT;
 static expert_field ei_mptcp_analysis_unsupported_algorithm = EI_INIT;
 static expert_field ei_mptcp_mapping_missing = EI_INIT;
 static expert_field ei_mptcp_stream_incomplete = EI_INIT;
+static expert_field ei_mptcp_analysis_dsn_out_of_order = EI_INIT;
 
 /* Some protocols such as encrypted DCE/RPCoverHTTP have dependencies
  * from one PDU to the next PDU and require that they are called in sequence.
@@ -680,6 +683,33 @@ tcpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_
     return 1;
 }
 
+static int
+mptcpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+{
+    conv_hash_t *hash = (conv_hash_t*) pct;
+    const struct tcpheader *tcphdr=(const struct tcpheader *)vip;
+
+    /* TODO do I need to change tcp_ct_dissector_info ? 
+    add_conversation_table_data_with_conv_id(conv_hash_t *ch, const address *src, const address *dst, guint32 src_port,
+    guint32 dst_port, conv_id_t conv_id, int num_frames, int num_bytes,
+    nstime_t *ts, nstime_t *abs_ts, ct_dissector_info_t *ct_info, port_type ptype);
+    */
+    add_conversation_table_data_with_conv_id(hash, 
+        //! these should be the one of the master
+//        &tcphdr->ip_src,
+        &tcphdr->th_mptcp->ip_src, 
+        &tcphdr->th_mptcp->ip_dst, 
+//            &tcphdr->ip_dst,
+//        
+//        tcphdr->ip_dst
+//        tcphdr->th_sport, tcphdr->th_dport, 
+        42, 24, 
+            (conv_id_t) tcphdr->th_mptcp->mh_stream, 1, pinfo->fd->pkt_len,
+                                              &pinfo->rel_ts, &pinfo->fd->abs_ts, &tcp_ct_dissector_info, PT_TCP);
+
+    return 1;
+}
+
 static const char* tcp_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
 {
     if (filter == CONV_FT_SRC_PORT)
@@ -789,6 +819,7 @@ static gboolean mptcp_analyze_mappings    = FALSE;
 /* Describe the fields sniffed and set in mptcp_meta_flow_t:static_flags */
 #define MPTCP_META_HAS_KEY  0x01
 #define MPTCP_META_HAS_TOKEN  0x02
+#define MPTCP_META_HAS_ADDRESSES  0x04
 
 /* Describe the fields sniffed and set in mptcp_meta_flow_t:static_flags */
 #define MPTCP_SUBFLOW_HAS_NONCE 0x01
@@ -2101,7 +2132,10 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
             /* now if this is the first time and we have been able to map dsn_low and dsn_high,
               we need to register it
              */
-            if(!error) {
+            if(!error 
+                && dsn_low != tcpd->fwd->mptcp_subflow->meta->base_dsn 
+                && dsn_low != tcpd->fwd->mptcp_subflow->meta->base_dsn-1) 
+            {
 
                 wmem_range_t request;
 //                wmem_range_t* results = NULL;
@@ -2134,9 +2168,50 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                     expert_add_info(pinfo, tree, &ei_mptcp_stream_incomplete);
                 }
                 else {
+//                    frame_data *fd;
                     mptcp_dsn2packet_mapping_t *map = NULL;
-                    map =  (mptcp_dsn2packet_mapping_t *) (results - offsetof(mptcp_dsn2packet_mapping_t, dsn_range));
+                    map = (mptcp_dsn2packet_mapping_t *) (results - offsetof(mptcp_dsn2packet_mapping_t, dsn_range));
 
+//                    printf("Found dsn_low-1 !:\n");
+//                    printf("Found dsn_low-1 !:\n");
+//                    proto_tree_add_debug_text(tree, "%lu found in packet %u", dsn_low-1, map->frame);
+
+//                    PINFO_FD_NUM(pinfo);
+//                    Now if we compare
+                    proto_tree_add_debug_text(tree, "%lu found in packet %u (current frame=%u)", dsn_low-1, map->frame, PINFO_FD_NUM(pinfo));
+//                    fd = 
+                    {
+                    const nstime_t *t2 = epan_get_frame_ts(pinfo->epan, map->frame);
+                    
+                    if(t2) {
+                    nstime_t delta;
+//                    pinfo->fd
+//                    frame_data_sequence_find(
+//                    proto_tree_add_debug_text(tree, "Application latency=%u (current frame=%u)", );
+//                     pinfo->fd
+                        nstime_delta(&delta, &pinfo->fd->abs_ts, t2);
+                        
+                        /* TODO maybe add a ns_* function to know if time is positive or negative */
+                        if(delta.secs < 0 || delta.nsecs < 0) {
+                            expert_add_info(pinfo, tree, &ei_mptcp_analysis_dsn_out_of_order);
+                            col_prepend_fence_fstr(pinfo->cinfo, COL_INFO, "[MPTCP Out-Of-Order] ");                        
+                        
+                            /* now i want to get a positive time so I should check for the previous dsn until I reach a positvie time*/
+                            /* Now I send a request to compute the application latency between this dsn and the previous one */
+                            // to display I would need to get the lowest dsn
+//                            while()
+//                            wmem_itree_find_point(tcpd->fwd->mptcp_subflow->meta->dsn_map, dsn_low-1, &results );
+                        }
+                        proto_tree_add_time(tree, hf_mptcp_application_latency, tvb, offset, 0, &delta);
+                        
+                        
+                    }
+                    else {
+                        /* fail silently */
+                        proto_tree_add_debug_text(tree, "Could not find ");
+                    }
+                     
+                    }
                     // TODO afficher le decalage de temps entre les 2 paquets/emissions
                     // en comparant les temps des 2 frames !!
                     //
@@ -3247,7 +3322,7 @@ mptcp_alloc_analysis(struct tcp_analysis* tcpd) {
     mptcpd->stream = mptcp_stream_count++;
     tcpd->mptcp_analysis = mptcpd;
 
-    memset(&mptcpd->meta_flow, 2, sizeof(mptcp_meta_flow_t));
+    memset(&mptcpd->meta_flow, 0, 2*sizeof(mptcp_meta_flow_t));
 
     /* allocate trees for each meta flow */
     mptcpd->meta_flow[0].dsn_map = wmem_itree_new(wmem_file_scope());
@@ -3750,6 +3825,21 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
 
     DISSECTOR_ASSERT(mptcpd);
     DISSECTOR_ASSERT(tcpd->mptcp_analysis);
+
+    /* if mptcpd was just allocated, remember the initial addresses 
+     * to act as the single MPTCP addresses for the conversation filter
+     */
+//    if(!tcpd->fwd->mptcp_subflow->meta->ip_src.len == 0) {
+    if( !(tcpd->fwd->mptcp_subflow->meta->static_flags & MPTCP_META_HAS_ADDRESSES) ) {
+        printf("EUREKA\n");
+        tcpd->fwd->mptcp_subflow->meta->static_flags |= MPTCP_META_HAS_ADDRESSES;
+        COPY_ADDRESS(&tcpd->fwd->mptcp_subflow->meta->ip_src, &tcph->ip_src);
+        COPY_ADDRESS(&tcpd->fwd->mptcp_subflow->meta->ip_dst, &tcph->ip_dst);
+
+        // we Could do a shallow copy here
+        COPY_ADDRESS(&tcpd->rev->mptcp_subflow->meta->ip_src, &tcph->ip_dst);
+        COPY_ADDRESS(&tcpd->rev->mptcp_subflow->meta->ip_dst, &tcph->ip_src);
+    }
 
     mph->mh_stream = tcpd->mptcp_analysis->stream;
 }
@@ -5636,14 +5726,10 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
     if (tcph->th_mptcp) {
 
-        if(tcpd->mptcp_analysis) {
-        /* Copy the stream index into the header as well to make it available
-         * to tap listeners.
-         */
-            tcph->th_mptcp->mh_stream = tcpd->mptcp_analysis->stream;
-        }
+        COPY_ADDRESS_SHALLOW(&tcph->th_mptcp->ip_src, &tcpd->fwd->mptcp_subflow->meta->ip_src);
+        COPY_ADDRESS_SHALLOW(&tcph->th_mptcp->ip_dst, &tcpd->fwd->mptcp_subflow->meta->ip_dst);
 
-
+        /* if it has a master copy ip/port/src/dest of this master*/
         if (tcp_analyze_mptcp) {
             mptcp_add_analysis_subtree(pinfo, tvb, tcp_tree, tcpd, tcpd->mptcp_analysis, tcph );
         }
@@ -5674,6 +5760,12 @@ dissect_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     }
 
     tap_queue_packet(tcp_tap, pinfo, tcph);
+
+    /* if it is an MPTCP packet */
+    if(tcph->th_mptcp) {
+        /* should we pass the TCP header ? */
+        tap_queue_packet(mptcp_tap, pinfo, tcph);
+    }
 
     /* If we're reassembling something whose length isn't known
      * beforehand, and that runs all the way to the end of
@@ -6676,6 +6768,7 @@ proto_register_tcp(void)
         { &ei_mptcp_analysis_unsupported_algorithm, { "mptcp.analysis.unsupported_algorithm", PI_PROTOCOL, PI_WARN, "Unsupported algorithm", EXPFILL }},
         { &ei_mptcp_mapping_missing, { "mptcp.dss.missing_mapping", PI_PROTOCOL, PI_WARN, "No mapping available", EXPFILL }},
         { &ei_mptcp_stream_incomplete, { "mptcp.incomplete", PI_PROTOCOL, PI_WARN, "Everything was not captured", EXPFILL }},
+        { &ei_mptcp_analysis_dsn_out_of_order, { "mptcp.analysis.dsn.out_of_order", PI_PROTOCOL, PI_WARN, "Out of order dsn", EXPFILL }},
     };
 
     static hf_register_info mptcp_hf[] = {
@@ -6718,7 +6811,7 @@ proto_register_tcp(void)
         // FT_FRAMENUM
         { &hf_mptcp_application_latency,
           { "Application latency", "mptcp.app_latency", FT_RELATIVE_TIME,
-            BASE_DEC, NULL, 0x0,
+            BASE_NONE, NULL, 0x0,
             "Gives the elapsed time between the head DSN of this packet and the packet transporting DSN-1", HFILL}},
 
         { &hf_mptcp_analysis_subflows,
@@ -6876,7 +6969,9 @@ proto_register_tcp(void)
         "In depth analysis of Data Sequence Signal mappings",
         "Assume TCP Option MPTCP (30)",
         &mptcp_analyze_mappings);
-
+    
+    /* typedef gboolean (*tap_packet_cb)(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data); */
+    register_conversation_table(proto_mptcp, FALSE, mptcpip_conversation_packet, tcpip_hostlist_packet);
 }
 
 void
@@ -6889,6 +6984,8 @@ proto_reg_handoff_tcp(void)
     data_handle = find_dissector("data");
     sport_handle = find_dissector("sport");
     tcp_tap = register_tap("tcp");
+
+    mptcp_tap = register_tap("mptcp");
 }
 
 /*

@@ -72,6 +72,12 @@ struct mptcpheader {
 	guint32 mh_token; /* seen in MP_JOIN. Should be a hash of the initial key */
 
 	guint32 mh_stream; /* this stream index field is included to help differentiate when address/port pairs are reused */
+
+	/* adresses of the master */
+	guint16 mh_sport;
+	guint16 mh_dport;
+	address ip_src;
+	address ip_dst;
 };
 
 /* the tcp header structure, passed to tap listeners */
@@ -244,6 +250,10 @@ typedef struct _mptcp_meta_flow_t {
 	 * Ideally this should help
 	 */
 	wmem_itree_t *dsn_map;
+
+	/* first addresses registered */
+	address ip_src;
+	address ip_dst;
 } mptcp_meta_flow_t;
 
 /* MPTCP data specific to this subflow direction */
