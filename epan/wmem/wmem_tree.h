@@ -66,6 +66,8 @@ struct _wmem_tree_node_t {
     wmem_node_color_t color;
     gboolean          is_subtree;
     gboolean          is_removed;
+    
+
 };
 
 typedef struct _wmem_tree_node_t wmem_tree_node_t;
@@ -77,6 +79,7 @@ struct _wmem_tree_t {
     wmem_tree_node_t *root;
     guint             master_cb_id;
     guint             slave_cb_id;
+    gboolean          is_interval_tree;
 
 // see it as an augmented tree
 // TODO here we can add a few callbacks, to display the tree for instance

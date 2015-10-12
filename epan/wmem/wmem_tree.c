@@ -31,6 +31,7 @@
 #include "wmem_core.h"
 #include "wmem_strutl.h"
 #include "wmem_tree.h"
+#include "wmem_interval_tree.h"
 #include "wmem_user_cb.h"
 
 
@@ -62,6 +63,11 @@ node_uncle(wmem_tree_node_t *node)
 static void rb_insert_case1(wmem_tree_t *tree, wmem_tree_node_t *node);
 static void rb_insert_case2(wmem_tree_t *tree, wmem_tree_node_t *node);
 
+static gboolean
+is_interval_tree(wmem_tree_t *tree) {
+    return tree->is_interval_tree;
+}
+
 static void
 rotate_left(wmem_tree_t *tree, wmem_tree_node_t *node)
 {
@@ -82,8 +88,13 @@ rotate_left(wmem_tree_t *tree, wmem_tree_node_t *node)
     node->right         = node->right->left;
     if (node->right) {
         node->right->parent = node;
+
     }
     node->parent->left = node;
+
+    if (is_interval_tree(tree)) {
+        update_max_edge(node);
+    }
 }
 
 static void
@@ -107,7 +118,13 @@ rotate_right(wmem_tree_t *tree, wmem_tree_node_t *node)
     if (node->left) {
         node->left->parent = node;
     }
+
     node->parent->right = node;
+
+
+    if (is_interval_tree(tree)) {
+        update_max_edge(node);
+    }
 }
 
 static void
@@ -206,6 +223,7 @@ wmem_tree_new(wmem_allocator_t *allocator)
     tree->allocator = allocator;
     tree->root      = NULL;
 
+    tree->is_interval_tree = FALSE;
     return tree;
 }
 

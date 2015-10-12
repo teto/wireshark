@@ -2017,6 +2017,9 @@ mptcp_print_mapping(mptcp_dss_mapping_t *mapping)
         );
 }
 
+// TODO move code to these functions
+//mptcp_add_dsn_analysis()
+// mptcp_add_jitter_analysis
 /* Print subflow list */
 static void
 mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent_tree,
@@ -2128,14 +2131,20 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
 
 
 
+            nstime_t delta;
+            nstime_t highest_time;
+            nstime_copy(&highest_time, &pinfo->fd->abs_ts);
+            guint64 requested_dsn = dsn_low-1;
 
             /* now if this is the first time and we have been able to map dsn_low and dsn_high,
               we need to register it
              */
-            if(!error 
-                && dsn_low != tcpd->fwd->mptcp_subflow->meta->base_dsn 
-                && dsn_low != tcpd->fwd->mptcp_subflow->meta->base_dsn-1) 
+            if(!error && tcpd->fwd->mptcp_subflow->meta->base_dsn != dsn_low) 
             {
+
+//                dsn_low != tcpd->fwd->mptcp_subflow->meta->base_dsn-1
+                /* duration between the last inorder packet and the packet that will allow processing the current packet */
+
 
                 wmem_range_t request;
 //                wmem_range_t* results = NULL;
@@ -2157,66 +2166,109 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                     wmem_itree_insert(tcpd->fwd->mptcp_subflow->meta->dsn_map, &packet->dsn_range);
                 }
 
-                /* look for the packet with the DSN just before dsn_low and display the elapsed time between the 2
+                /* look for the packet with the DSN just before dsn_low and 
+                compute the elapsed time between the first packet arrived before this one and the one that allows 
+                this packet to be processed, i.e. if this packet arrives in order, looks for the packet just before,
+                if it is out of order, look 2
                   compare with base_dsn
                 */
+//                #if 0
+                // TODO put a configurable limit ?
+                // TODO save the result as a packet extra data
+                int i = 0;
+                while(i < 5) {
+                    i++;
+                    // 2nd one should not be needed
+                    if(requested_dsn == tcpd->fwd->mptcp_subflow->meta->base_dsn-1
+                        || requested_dsn == tcpd->fwd->mptcp_subflow->meta->base_dsn
+                        ) {
+                        proto_tree_add_debug_text(tree, "dsn = base dsn: skipping search...");
+                        break;
+                    }
+                
 
-                /* Now I send a request to compute the application latency between this dsn and the previous one */
-                wmem_itree_find_point(tcpd->fwd->mptcp_subflow->meta->dsn_map, dsn_low-1, &results );
+                    /* Now I send a request to compute the application latency between this dsn and the previous one */
+                    wmem_itree_find_point(tcpd->fwd->mptcp_subflow->meta->dsn_map, requested_dsn, &results );
 
-                if(!results) {
-                    expert_add_info(pinfo, tree, &ei_mptcp_stream_incomplete);
-                }
-                else {
-//                    frame_data *fd;
-                    mptcp_dsn2packet_mapping_t *map = NULL;
-                    map = (mptcp_dsn2packet_mapping_t *) (results - offsetof(mptcp_dsn2packet_mapping_t, dsn_range));
-
-//                    printf("Found dsn_low-1 !:\n");
-//                    printf("Found dsn_low-1 !:\n");
-//                    proto_tree_add_debug_text(tree, "%lu found in packet %u", dsn_low-1, map->frame);
-
-//                    PINFO_FD_NUM(pinfo);
-//                    Now if we compare
-                    proto_tree_add_debug_text(tree, "%lu found in packet %u (current frame=%u)", dsn_low-1, map->frame, PINFO_FD_NUM(pinfo));
-//                    fd = 
-                    {
-                    const nstime_t *t2 = epan_get_frame_ts(pinfo->epan, map->frame);
-                    
-                    if(t2) {
-                    nstime_t delta;
-//                    pinfo->fd
-//                    frame_data_sequence_find(
-//                    proto_tree_add_debug_text(tree, "Application latency=%u (current frame=%u)", );
-//                     pinfo->fd
-                        nstime_delta(&delta, &pinfo->fd->abs_ts, t2);
-                        
-                        /* TODO maybe add a ns_* function to know if time is positive or negative */
-                        if(delta.secs < 0 || delta.nsecs < 0) {
-                            expert_add_info(pinfo, tree, &ei_mptcp_analysis_dsn_out_of_order);
-                            col_prepend_fence_fstr(pinfo->cinfo, COL_INFO, "[MPTCP Out-Of-Order] ");                        
-                        
-                            /* now i want to get a positive time so I should check for the previous dsn until I reach a positvie time*/
-                            /* Now I send a request to compute the application latency between this dsn and the previous one */
-                            // to display I would need to get the lowest dsn
-//                            while()
-//                            wmem_itree_find_point(tcpd->fwd->mptcp_subflow->meta->dsn_map, dsn_low-1, &results );
-                        }
-                        proto_tree_add_time(tree, hf_mptcp_application_latency, tvb, offset, 0, &delta);
-                        
-                        
+                    if(!results) {
+                        expert_add_info(pinfo, tree, &ei_mptcp_stream_incomplete);
+                        break;
                     }
                     else {
-                        /* fail silently */
-                        proto_tree_add_debug_text(tree, "Could not find ");
-                    }
-                     
-                    }
-                    // TODO afficher le decalage de temps entre les 2 paquets/emissions
-                    // en comparant les temps des 2 frames !!
-                    //
+    //                    frame_data *fd;
+                        mptcp_dsn2packet_mapping_t *map = NULL;
+                        map = (mptcp_dsn2packet_mapping_t *) (results - offsetof(mptcp_dsn2packet_mapping_t, dsn_range));
 
+    //                    printf("Found dsn_low-1 !:\n");
+    //                    printf("Found dsn_low-1 !:\n");
+    //                    proto_tree_add_debug_text(tree, "%lu found in packet %u", dsn_low-1, map->frame);
+
+    //                    PINFO_FD_NUM(pinfo);
+    //                    Now if we compare
+                        proto_tree_add_debug_text(tree, "%lu found in packet %u (current frame=%u)", dsn_low-1, map->frame, PINFO_FD_NUM(pinfo));
+    //                    fd = 
+                        
+////////////////////////////////////////////////
+///// TOODO here use packet number instead of comparing times
+                        const nstime_t *t2 = epan_get_frame_ts(pinfo->epan, map->frame);
+                        if(!t2) {
+                            proto_tree_add_debug_text(tree, "Could not find packet, an error happened");
+                            break;
+                        }
+                        
+                        // TODO coomp
+                        int res = nstime_cmp(&highest_time, t2);
+                        if(res == 0) {
+                            proto_tree_add_debug_text(tree, "Could not find packet, an error happened");
+                            break;
+                        }
+                        else if(res > 0) {
+                            nstime_delta(&delta, &highest_time, t2);
+                            proto_tree_add_time(tree, hf_mptcp_application_latency, tvb, offset, 0, &delta);
+                            break;
+                        }
+                        /* res < 0 */
+                        else {
+    //                    pinfo->fd
+    //                    frame_data_sequence_find(
+    //                    proto_tree_add_debug_text(tree, "Application latency=%u (current frame=%u)", );
+    //                     pinfo->fd
+                            
+                            
+                            /* TODO maybe add a ns_* function to know if time is positive or negative */
+//                            if(delta.secs < 0 || delta.nsecs < 0) {
+//                                expert_add_info(pinfo, tree, &ei_mptcp_analysis_dsn_out_of_order);
+                                // TODO write it only once
+//                                col_prepend_fence_fstr(pinfo->cinfo, COL_INFO, "[MPTCP Out-Of-Order] ");                        
+                                requested_dsn = map->dsn_range.low - 1;
+                                nstime_copy(&highest_time, t2);
+                                
+                                /* now i want to get a positive time so I should check for the previous dsn until I reach a positvie time*/
+                                /* Now I send a request to compute the application latency between this dsn and the previous one */
+                                // to display I would need to get the lowest dsn
+//                            }
+//                            else {
+//                                break;
+//                            }
+                            
+                            
+                            
+                        }
+                         
+                        
+                        // TODO afficher le decalage de temps entre les 2 paquets/emissions
+                        // en comparant les temps des 2 frames !!
+                        //
+
+                    }
+                    
+                }   //! while
+                
+                if(!error) {
+                    // Display
+                    
                 }
+//                #endif
             }
 
         }
@@ -3831,7 +3883,7 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
      */
 //    if(!tcpd->fwd->mptcp_subflow->meta->ip_src.len == 0) {
     if( !(tcpd->fwd->mptcp_subflow->meta->static_flags & MPTCP_META_HAS_ADDRESSES) ) {
-        printf("EUREKA\n");
+//        printf("EUREKA\n");
         tcpd->fwd->mptcp_subflow->meta->static_flags |= MPTCP_META_HAS_ADDRESSES;
         COPY_ADDRESS(&tcpd->fwd->mptcp_subflow->meta->ip_src, &tcph->ip_src);
         COPY_ADDRESS(&tcpd->fwd->mptcp_subflow->meta->ip_dst, &tcph->ip_dst);
@@ -6812,6 +6864,7 @@ proto_register_tcp(void)
         { &hf_mptcp_application_latency,
           { "Application latency", "mptcp.app_latency", FT_RELATIVE_TIME,
             BASE_NONE, NULL, 0x0,
+            // TODO update
             "Gives the elapsed time between the head DSN of this packet and the packet transporting DSN-1", HFILL}},
 
         { &hf_mptcp_analysis_subflows,

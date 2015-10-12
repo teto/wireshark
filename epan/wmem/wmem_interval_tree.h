@@ -70,7 +70,7 @@ wmem_itree_insert(wmem_itree_t *tree, wmem_range_t *);
 
 WS_DLL_PUBLIC
 void
-wmem_itree_update_maxima(wmem_itree_t *tree);
+update_max_edge(wmem_tree_node_t *node);
 
 /*
 Save results in

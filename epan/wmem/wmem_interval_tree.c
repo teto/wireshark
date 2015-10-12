@@ -58,15 +58,17 @@ do_range_overlap(wmem_range_t *r1, wmem_range_t *r2)
 wmem_itree_t *
 wmem_itree_new(wmem_allocator_t *allocator)
 {
-    return wmem_tree_new(allocator);
+    wmem_itree_t *tree = wmem_tree_new(allocator);
+    tree->is_interval_tree = TRUE;
+    return tree;
 }
 
 /*
 probleme c que la on regarde d'abord les enfants gacuhe, soit mm puis les enfantsz de droite
 regarder d'abord soit puis update le parent en cas de rotation ?
 */
-static void
-update_maximum(wmem_tree_node_t *node)
+void
+update_max_edge(wmem_tree_node_t *node)
 {
 //    wmem_tree_node_t *node = (wmem_tree_node_t *) value;
     wmem_range_t *range;
@@ -79,12 +81,12 @@ update_maximum(wmem_tree_node_t *node)
 
 
     printf("Updating maximum\n");
-    print_range(range, 0);
+//    print_range(range, 0);
 
     wmem_range_t *range_l = (node->left) ? (wmem_range_t *) (node->left->data) : NULL;
     wmem_range_t *range_r = (node->right) ? (wmem_range_t *) (node->right->data) : NULL;
 
-    guint32 maxEdge = range->high;
+    guint32 maxEdge = range->max_edge;
 
     // TODO assigner le max entre ses enfants et son high
     // Pointeur vers la data, remonter a la racine
@@ -102,14 +104,17 @@ update_maximum(wmem_tree_node_t *node)
         maxEdge = MAX(maxEdge, range_l->max_edge) ;
     }
 
-    range->max_edge = maxEdge;
-
-    if(node->parent && node->parent->left != node) {
-    // in case of rotation
-        update_maximum(node->parent->left);
-
+    /* if there was an update of this node max_edge, propagate this to the parent nodes */
+    if(range->max_edge <= maxEdge) {
+        range->max_edge = maxEdge;
+        update_max_edge(node->parent);
     }
-    update_maximum(node->parent);
+//    if(node->parent && node->parent->left != node) {
+//    // in case of rotation
+//        update_maximum(node->parent->left);
+//
+//    }
+    
 //    return FALSE;
 }
 
@@ -145,12 +150,15 @@ wmem_itree_insert(wmem_itree_t *tree, wmem_range_t *range)
     // Returns a pointer to the range
     printf("Inserting range\n");
     print_range(range, 0);
-    g_assert(range->low < range->high);
+    /* */
+    g_assert(range->low <= range->high);
     range->max_edge = range->high;
      wmem_tree_node_t *node = wmem_tree_insert32_matt(tree, range->low, range);
-
+     
+    // If no rotations, still a need to update max_edge
+    update_max_edge(node);
 //    if()
-    update_maximum(node);
+//    update_maximum(node);
     // Not efficient at all but ok for testing I suppose ?
     // TODO pass the node
 //    wmem_itree_update_maxima(tree);
