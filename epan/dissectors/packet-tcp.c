@@ -689,21 +689,21 @@ mptcpip_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _
     conv_hash_t *hash = (conv_hash_t*) pct;
     const struct tcpheader *tcphdr=(const struct tcpheader *)vip;
 
-    /* TODO do I need to change tcp_ct_dissector_info ? 
+    /* TODO do I need to change tcp_ct_dissector_info ?
     add_conversation_table_data_with_conv_id(conv_hash_t *ch, const address *src, const address *dst, guint32 src_port,
     guint32 dst_port, conv_id_t conv_id, int num_frames, int num_bytes,
     nstime_t *ts, nstime_t *abs_ts, ct_dissector_info_t *ct_info, port_type ptype);
     */
-    add_conversation_table_data_with_conv_id(hash, 
+    add_conversation_table_data_with_conv_id(hash,
         //! these should be the one of the master
 //        &tcphdr->ip_src,
-        &tcphdr->th_mptcp->ip_src, 
-        &tcphdr->th_mptcp->ip_dst, 
+        &tcphdr->th_mptcp->ip_src,
+        &tcphdr->th_mptcp->ip_dst,
 //            &tcphdr->ip_dst,
-//        
+//
 //        tcphdr->ip_dst
-//        tcphdr->th_sport, tcphdr->th_dport, 
-        42, 24, 
+//        tcphdr->th_sport, tcphdr->th_dport,
+        42, 24,
             (conv_id_t) tcphdr->th_mptcp->mh_stream, 1, pinfo->fd->pkt_len,
                                               &pinfo->rel_ts, &pinfo->fd->abs_ts, &tcp_ct_dissector_info, PT_TCP);
 
@@ -2001,7 +2001,7 @@ mptcp_map_ssn_to_dsn(mptcp_dss_mapping_t *mapping, guint32 ssn, guint64 *dsn)
         return FALSE;
     }
 
-    *dsn = mapping->dsn + ( ssn - mapping->ssn_range.low);
+    *dsn = mapping->rawdsn + ( ssn - mapping->ssn_range.low);
     return TRUE;
 }
 
@@ -2010,7 +2010,7 @@ static void
 mptcp_print_mapping(mptcp_dss_mapping_t *mapping)
 {
     printf("Mapping DSN %lu to SSN %u-%u (found in frame %u)\n",
-        mapping->dsn,
+        mapping->rawdsn,
         mapping->ssn_range.low,
         mapping->ssn_range.high,
         mapping->frame
@@ -2068,12 +2068,16 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
     if(mptcp_analyze_mappings && tcph->th_seglen)
     {
         int offset = 0;
-//                    GSlist *results = NULL;
+//      GSlist *results = NULL;
         mptcp_dss_mapping_t *mapping = NULL;
         wmem_range_t *results = NULL;
         wmem_range_t requested_ssn_range;
 
-        /* retrieve all mappings that cover this packet */
+        /* TODO it must be converted into SSNs since mapping use relative ssn !
+         * creer une fct du style mptcp_can_aanlyze_mapping ?
+         * et en profiter pr mettre le tcph->th_rawseq et tcph->seq comme pour mptcp
+         * retrieve all mappings that cover this packet
+         */
         requested_ssn_range.low = tcph->th_seq;
         requested_ssn_range.high = tcph->th_seq + tcph->th_seglen - 1;
 //        requested_ssn_range.max_edge = 0;
@@ -2099,6 +2103,19 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
 
             if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq, &dsn_low)) {
 
+                /* print head & tail dsn */
+                if(mptcp_convert_dsn(dsn_low, tcpd->fwd->mptcp_subflow->meta,
+                    (mapping->extended_dsn) ? DSN_CONV_NONE : DSN_CONV_32_TO_64, tcp_relative_seq, &dsn_low)) {
+                    item = proto_tree_add_uint64(tree, hf_mptcp_dsn, tvb, 0, 0, dsn_low);
+                    if (tcp_relative_seq) {
+                            proto_item_append_text(item, " (Relative)");
+                    }
+                    PROTO_ITEM_SET_GENERATED(item);
+                }
+                else {
+                    /* ignore and continue */
+                }
+
                 /* TODO add the ability to display it relatively */
                 printf("DSN_LOW \n");
                 item = proto_tree_add_uint64_format_value(
@@ -2113,6 +2130,11 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                 error = TRUE;
             }
 
+
+            #if 0
+            /* Display end of the segment.
+             * For now assumes it's part of the same mapping but it may not ?!
+             */
             if(mptcp_map_ssn_to_dsn(mapping, tcph->th_seq + tcph->th_seglen - 1, &dsn_high) ) {
 
                 printf("DSN_HIGH \n");
@@ -2128,18 +2150,20 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                 "Failed to map ssn %u", tcph->th_seq+ tcph->th_seglen- 1);
                 error = TRUE;
             }
+            #endif
 
 
 
+           #if 0
             nstime_t delta;
             nstime_t highest_time;
             nstime_copy(&highest_time, &pinfo->fd->abs_ts);
             guint64 requested_dsn = dsn_low-1;
-
             /* now if this is the first time and we have been able to map dsn_low and dsn_high,
               we need to register it
              */
-            if(!error && tcpd->fwd->mptcp_subflow->meta->base_dsn != dsn_low) 
+
+            if(!error && tcpd->fwd->mptcp_subflow->meta->base_dsn != dsn_low)
             {
 
 //                dsn_low != tcpd->fwd->mptcp_subflow->meta->base_dsn-1
@@ -2166,8 +2190,8 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                     wmem_itree_insert(tcpd->fwd->mptcp_subflow->meta->dsn_map, &packet->dsn_range);
                 }
 
-                /* look for the packet with the DSN just before dsn_low and 
-                compute the elapsed time between the first packet arrived before this one and the one that allows 
+                /* look for the packet with the DSN just before dsn_low and
+                compute the elapsed time between the first packet arrived before this one and the one that allows
                 this packet to be processed, i.e. if this packet arrives in order, looks for the packet just before,
                 if it is out of order, look 2
                   compare with base_dsn
@@ -2185,7 +2209,7 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                         proto_tree_add_debug_text(tree, "dsn = base dsn: skipping search...");
                         break;
                     }
-                
+
 
                     /* Now I send a request to compute the application latency between this dsn and the previous one */
                     wmem_itree_find_point(tcpd->fwd->mptcp_subflow->meta->dsn_map, requested_dsn, &results );
@@ -2206,8 +2230,8 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
     //                    PINFO_FD_NUM(pinfo);
     //                    Now if we compare
                         proto_tree_add_debug_text(tree, "%lu found in packet %u (current frame=%u)", dsn_low-1, map->frame, PINFO_FD_NUM(pinfo));
-    //                    fd = 
-                        
+    //                    fd =
+
 ////////////////////////////////////////////////
 ///// TOODO here use packet number instead of comparing times
                         const nstime_t *t2 = epan_get_frame_ts(pinfo->epan, map->frame);
@@ -2215,7 +2239,7 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
                             proto_tree_add_debug_text(tree, "Could not find packet, an error happened");
                             break;
                         }
-                        
+
                         // TODO coomp
                         int res = nstime_cmp(&highest_time, t2);
                         if(res == 0) {
@@ -2233,16 +2257,16 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
     //                    frame_data_sequence_find(
     //                    proto_tree_add_debug_text(tree, "Application latency=%u (current frame=%u)", );
     //                     pinfo->fd
-                            
-                            
+
+
                             /* TODO maybe add a ns_* function to know if time is positive or negative */
 //                            if(delta.secs < 0 || delta.nsecs < 0) {
 //                                expert_add_info(pinfo, tree, &ei_mptcp_analysis_dsn_out_of_order);
                                 // TODO write it only once
-//                                col_prepend_fence_fstr(pinfo->cinfo, COL_INFO, "[MPTCP Out-Of-Order] ");                        
+//                                col_prepend_fence_fstr(pinfo->cinfo, COL_INFO, "[MPTCP Out-Of-Order] ");
                                 requested_dsn = map->dsn_range.low - 1;
                                 nstime_copy(&highest_time, t2);
-                                
+
                                 /* now i want to get a positive time so I should check for the previous dsn until I reach a positvie time*/
                                 /* Now I send a request to compute the application latency between this dsn and the previous one */
                                 // to display I would need to get the lowest dsn
@@ -2250,27 +2274,27 @@ mptcp_add_analysis_subtree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *parent
 //                            else {
 //                                break;
 //                            }
-                            
-                            
-                            
+
+
+
                         }
-                         
-                        
+
+
                         // TODO afficher le decalage de temps entre les 2 paquets/emissions
                         // en comparant les temps des 2 frames !!
                         //
 
                     }
-                    
+
                 }   //! while
-                
+
                 if(!error) {
                     // Display
-                    
-                }
-//                #endif
-            }
 
+                }
+//
+            }
+            #endif
         }
 
         /* register the mapping dsn <-> data into the meta */
@@ -3776,7 +3800,8 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                         mapping = wmem_new0(wmem_file_scope(), mptcp_dss_mapping_t);
 
                         mapping->ssn_range.max_edge = 0;
-                        mapping->dsn  = mph->mh_rawdsn;
+                        mapping->rawdsn  = mph->mh_rawdsn;
+                        mapping->extended_dsn = (mph->mh_dss_flags & MPTCP_DSS_FLAG_DATA_8BYTES);
                         mapping->frame = PINFO_FD_NUM(pinfo);
 
                         mapping->ssn_range.low  = mph->mh_ssn;
@@ -3787,7 +3812,7 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                         printf("Just registered SSN mapping %u-%u to dsn %lu\n",
                                 mapping->ssn_range.low,
                                 mapping->ssn_range.high,
-                                mapping->dsn
+                                mapping->rawdsn
                                 );
                         wmem_print_itree(tcpd->fwd->mptcp_subflow->mappings);
                     }
@@ -3878,7 +3903,7 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
     DISSECTOR_ASSERT(mptcpd);
     DISSECTOR_ASSERT(tcpd->mptcp_analysis);
 
-    /* if mptcpd was just allocated, remember the initial addresses 
+    /* if mptcpd was just allocated, remember the initial addresses
      * to act as the single MPTCP addresses for the conversation filter
      */
 //    if(!tcpd->fwd->mptcp_subflow->meta->ip_src.len == 0) {
@@ -6833,7 +6858,7 @@ proto_register_tcp(void)
             BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
         { &hf_mptcp_dsn,
-          { "Data Sequence Number", "mptcp.dsn", FT_UINT64,
+          { "Data Sequence Number", "mptcp.dss.dsn", FT_UINT64,
             BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
         { &hf_mptcp_expected_idsn,
@@ -6853,9 +6878,10 @@ proto_register_tcp(void)
             "This frame has some of the MPTCP analysis shown", HFILL }},
 
         { &hf_mptcp_seg_dsn_start,
-          { "Segment Data Sequence Number start", "mptcp.dsn_start", FT_UINT64,
+          { "Segment Data Sequence Number start", "mptcp.dsn", FT_UINT64,
             BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
+        /* todo could it be removed ?*/
         { &hf_mptcp_seg_dsn_end,
           { "Segment Data Sequence Number end", "mptcp.dsn_end", FT_UINT64,
             BASE_DEC, NULL, 0x0, NULL, HFILL}},
@@ -7022,7 +7048,7 @@ proto_register_tcp(void)
         "In depth analysis of Data Sequence Signal mappings",
         "Assume TCP Option MPTCP (30)",
         &mptcp_analyze_mappings);
-    
+
     /* typedef gboolean (*tap_packet_cb)(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data); */
     register_conversation_table(proto_mptcp, FALSE, mptcpip_conversation_packet, tcpip_hostlist_packet);
 }

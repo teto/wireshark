@@ -205,9 +205,10 @@ typedef struct _mptcp_dss_mapping_t {
 
 wmem_range_t ssn_range;
 
+gboolean extended_dsn; /* TRUE if MPTCP_DSS_FLAG_DATA_8BYTES */
+
 /* additionnal fields */
-guint64 dsn;    /* matches the low member of range
-                TODO precise if it is a raw DSN
+guint64 rawdsn;    /* matches the low member of range
                 */
 /* set with PINFO_FD_NUM. Allow to check if mapping was sent before or after packet
 */
