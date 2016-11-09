@@ -2250,6 +2250,7 @@ guint64 rawdsn64low, guint64 rawdsn64high
     mptcp_dsn2packet_mapping_t *packet = NULL;
     proto_item *item = NULL;
 
+    printf("add_duplicated_dsn called");
     results = wmem_itree_find_intervals(subflow->mappings,
                     wmem_packet_scope(),
                     rawdsn64low,
@@ -2271,7 +2272,7 @@ guint64 rawdsn64low, guint64 rawdsn64high
     return packet;
 }
 
-/* Finds mappings that cover the sent data */
+/* Finds mappings that cover the sent data and adds them to the dissection tree */
 static mptcp_dss_mapping_t *
 mptcp_add_matching_dss_on_subflow(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, struct mptcp_subflow *subflow,
 guint32 relseq, guint32 seglen
@@ -7136,7 +7137,7 @@ proto_register_tcp(void)
 
         { &hf_mptcp_related_mapping,
           { "Related mapping",   "mptcp.related_mapping", FT_FRAMENUM , BASE_NONE, NULL, 0x0,
-            "Packet in which mapping describing current packet was sent", HFILL }},
+            "Packet in which current packet DSS mapping was sent", HFILL }},
 
         { &hf_mptcp_duplicated_data,
           { "Was data duplicated",   "mptcp.duplicated_dsn", FT_FRAMENUM , BASE_NONE, NULL, 0x0,
