@@ -121,7 +121,7 @@ wmem_itree_insert(wmem_itree_t *tree, const guint64 low, const guint64 high, voi
     node = wmem_tree_insert(tree, range, data, (compare_func)wmem_tree_compare_ranges);
 
     /* Even If no rotations, still a need to update max_edge */
-    update_max_edge(node);
+    update_max_edge(node->parent);
 }
 
 
@@ -152,7 +152,11 @@ wmem_list_t *
 wmem_itree_find_intervals(wmem_itree_t *tree, wmem_allocator_t *allocator, guint64 low, guint64 high)
 {
     wmem_list_t *results = NULL;
-    wmem_range_t requested = { low, high, 0 };
+    wmem_range_t requested = {
+        .low = low,
+        .high = high,
+        .max_edge = 0
+    };
     results = wmem_list_new(allocator);
 
     wmem_itree_find_intervals_in_subtree(tree->root, requested, results);
