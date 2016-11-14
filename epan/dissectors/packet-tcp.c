@@ -2250,8 +2250,10 @@ guint64 rawdsn64low, guint64 rawdsn64high
     mptcp_dsn2packet_mapping_t *packet = NULL;
     proto_item *item = NULL;
 
-    printf("add_duplicated_dsn called");
-    results = wmem_itree_find_intervals(subflow->mappings,
+    printf("add_duplicated_dsn %d: looking for %lu and %lu\n", pinfo->num, 
+            rawdsn64low, rawdsn64high);
+    /* wmem_print_itree(subflow->dsn_map); */
+    results = wmem_itree_find_intervals(subflow->dsn_map,
                     wmem_packet_scope(),
                     rawdsn64low,
                     rawdsn64high
@@ -2264,6 +2266,7 @@ guint64 rawdsn64low, guint64 rawdsn64high
 
         packet = (mptcp_dsn2packet_mapping_t *) wmem_list_frame_data(packet_it);
         DISSECTOR_ASSERT(packet);
+        printf("Found the result %d\n", packet->frame);
 
         item = proto_tree_add_uint(tree, hf_mptcp_duplicated_data, tvb, 0, 0, packet->frame);
         PROTO_ITEM_SET_GENERATED(item);
@@ -2274,31 +2277,44 @@ guint64 rawdsn64low, guint64 rawdsn64high
 
 /* Finds mappings that cover the sent data and adds them to the dissection tree */
 static mptcp_dss_mapping_t *
-mptcp_add_matching_dss_on_subflow(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, struct mptcp_subflow *subflow,
-guint32 relseq, guint32 seglen
+mptcp_add_matching_dss_on_subflow(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb,
+
+        wmem_list_t *results
+        /* struct mptcp_subflow *subflow, */
+/* guint32 relseq, guint32 seglen */
 )
 {
-    wmem_list_t *results = NULL;
+    /* wmem_list_t *results = NULL; */
     wmem_list_frame_t *dss_it = NULL;
     mptcp_dss_mapping_t *mapping = NULL;
     proto_item *item = NULL;
+    /* guint32 relssnhigh = (seglen) ? relseq + seglen - 1 : relseq; */
 
-    results = wmem_itree_find_intervals(subflow->mappings,
-                    wmem_packet_scope(),
-                    relseq,
-                    (seglen) ? relseq + seglen - 1 : relseq
-                    );
+    /* printf("packet %d: looking for tcp relseq %u and %u\n", pinfo->num, */ 
+            /* relseq, relssnhigh); */
 
-    for(dss_it=wmem_list_head(results);
-        dss_it!= NULL;
-        dss_it= wmem_list_frame_next(dss_it))
-    {
-        mapping = (mptcp_dss_mapping_t *) wmem_list_frame_data(dss_it);
-        DISSECTOR_ASSERT(mapping);
+    /* results = wmem_itree_find_intervals(subflow->mappings, */
+    /*                 wmem_packet_scope(), */
+    /*                 relseq, */
+    /*                 relssnhigh */
+                    
+    /*                 ); */
 
-        item = proto_tree_add_uint(tree, hf_mptcp_related_mapping, tvb, 0, 0, mapping->frame);
-        PROTO_ITEM_SET_GENERATED(item);
-    }
+
+    /* for most empty packets, it does not make sense to show the mapping as
+     * it would */
+    /* if(seglen) { */
+        for(dss_it=wmem_list_head(results);
+            dss_it!= NULL;
+            dss_it= wmem_list_frame_next(dss_it))
+        {
+            mapping = (mptcp_dss_mapping_t *) wmem_list_frame_data(dss_it);
+            DISSECTOR_ASSERT(mapping);
+
+            item = proto_tree_add_uint(tree, hf_mptcp_related_mapping, tvb, 0, 0, mapping->frame);
+            PROTO_ITEM_SET_GENERATED(item);
+        }
+    /* } */
 
     return mapping;
 }
@@ -2342,13 +2358,60 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
         rawdsn = tcpd->fwd->mptcp_subflow->meta->base_dsn;
         convert = DSN_CONV_NONE;
     }
-    else {
-        /* display packets that conveyed the mappings covering the data range */
-        mapping = mptcp_add_matching_dss_on_subflow(pinfo, parent_tree, tvb,
-                            tcpd->fwd->mptcp_subflow, relseq,
-                            (tcph->th_have_seglen) ? tcph->th_seglen : 0
-                                                    );
-        if(mapping == NULL) {
+    /* we don't map anymore */
+    /* if it's a non-syn packet without data (just used to convey TCP options) 
+        * then there would be no mappings */
+    else if(relseq == 1 && tcph->th_seglen == 0) {
+        /* most likely 
+            * TODO edge case if it's base_dsn + 1 ?*/
+        rawdsn = tcpd->fwd->mptcp_subflow->meta->base_dsn + 1;
+        convert = DSN_CONV_NONE;
+    }
+    /* if it's a acked fin or similar, don't try to map */
+    /* else if(relseq == tcpd->fwd->fin ) { */
+    /* return; */
+    /* } */
+    else  {
+
+        wmem_list_frame_t *dss_it = NULL;
+        wmem_list_t *results = NULL;
+        /* mptcp_dss_mapping_t *mapping = NULL; */
+        guint32 ssn_low = relseq;
+        /* gboolean add_mapping_to_tree = FALSE; */
+        guint32 seglen = tcph->th_seglen;
+        /* guint32 ssn_high = 0; */
+
+        /* if(tcph->th_have_seglen) */
+        /* if(seglen) */
+        /* { */
+        /*     ssn_low = relseq; */
+        /*     /1* ssn_high = relseq + tcph->th_seglen - 1; *1/ */
+        /* } */
+        /* if */
+        /* else { */
+        /*     /1* TODO look for previous mapping ? *1/ */
+        /*     /1* ssn_low = relseq; // -1 *1/ */
+        /*     /1* ssn_high = relseq; // -1; *1/ */
+        /*     return; */
+        /* } */
+        results = wmem_itree_find_intervals(tcpd->fwd->mptcp_subflow->mappings,
+                    wmem_packet_scope(),
+                    ssn_low,
+                    /* relssnhigh */
+                    (seglen) ? ssn_low + seglen - 1 : ssn_low            
+                    );
+        dss_it=wmem_list_head(results); /* assume it's always ok */
+        if(dss_it) {
+        
+            mapping = (mptcp_dss_mapping_t *) wmem_list_frame_data(dss_it);
+        }
+            /* DISSECTOR_ASSERT(mapping); */
+
+            /* item = proto_tree_add_uint(tree, hf_mptcp_related_mapping, tvb, 0, 0, mapping->frame); */
+            /* PROTO_ITEM_SET_GENERATED(item); */
+        /* } */
+        /* } */
+        if(dss_it == NULL || mapping == NULL) {
             expert_add_info(pinfo, parent_tree, &ei_mptcp_mapping_missing);
             return;
         }
@@ -2357,10 +2420,22 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
         }
 
         DISSECTOR_ASSERT(mapping);
+        if(seglen) {
+        /* display packets that conveyed the mappings covering the data range */
+            mptcp_add_matching_dss_on_subflow(pinfo, parent_tree, tvb,
+                results
+                            /* tcpd->fwd->mptcp_subflow, ssn_low, */
+                            /* tcph->th_seglen */
+            );
+        }
 
         convert = (mapping->extended_dsn) ? DSN_CONV_NONE : DSN_CONV_32_TO_64;
         DISSECTOR_ASSERT(mptcp_map_relssn_to_rawdsn(mapping, relseq, &rawdsn));
     }
+    /* else { */
+    /*     /1* don't map packets with no data and not in syn or just after ? *1/ */
+    /*     return; */
+    /* } */
 
     /* Make sure we have the 64bit raw DSN */
     if(mptcp_convert_dsn(rawdsn, tcpd->fwd->mptcp_subflow->meta,
@@ -2377,27 +2452,37 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
         }
 
         /* register */
-        if (!PINFO_FD_VISITED(pinfo))
+        if (!PINFO_FD_VISITED(pinfo) )
         {
-            mptcp_dsn2packet_mapping_t *packet;
+            mptcp_dsn2packet_mapping_t *packet = 0;
+            struct mptcp_subflow *fwd_sf = tcpd->fwd->mptcp_subflow;
             packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
             packet->frame = pinfo->fd->num;
-            packet->subflow = tcpd;
+            packet->subflow = tcpd; /* TODO do we need/use  it ? */
 
             /* tcph->th_mptcp->mh_rawdsn64 */
             if (tcph->th_have_seglen) {
+                printf("Adding to dsn_map of stream %d [%lu - %lu]\n", tcph->th_stream,
+                        tcph->th_mptcp->mh_rawdsn64,
+                        tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ));
+
+                /* wmem_print_itree(subflow->dsn_map); */
+                wmem_print_itree(fwd_sf->dsn_map);
                 wmem_itree_insert(tcpd->fwd->mptcp_subflow->dsn_map,
                         tcph->th_mptcp->mh_rawdsn64,
                         tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ),
                         packet
                         );
+
+                wmem_print_itree(fwd_sf->dsn_map);
             }
         }
         PROTO_ITEM_SET_GENERATED(item);
 
         /* We can do this only if rawdsn64 is valid !
         if enabled, look for overlapping mappings on other subflows */
-        if(mptcp_intersubflows_retransmission) {
+        if(mptcp_intersubflows_retransmission 
+                && tcph->th_have_seglen) {
 
             wmem_list_frame_t *subflow_it = NULL;
 
@@ -2408,10 +2493,11 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
 
                 /* for current subflow */
                 if (sf == tcpd->fwd->mptcp_subflow) {
-                    /* skip, was done just before */
+                    /* skip, this is the current subflow */
                 }
                 /* in case there were retransmissions on other subflows */
                 else  {
+                    printf("Searching for duplicates in subflow %d\n", sf_tcpd->stream) ; // , subflow_it->
                     mptcp_add_duplicated_dsn(pinfo, parent_tree, tvb, sf,
                                              tcph->th_mptcp->mh_rawdsn64,
                                              tcph->th_mptcp->mh_rawdsn64 + tcph->th_seglen-1);
@@ -2420,7 +2506,7 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
         }
     }
     else {
-        /* ignore and continue */
+        /* could not get the rawdsn64 ignore and continue */
     }
 
 }
@@ -3999,7 +4085,7 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
 
                     if (!PINFO_FD_VISITED(pinfo))
                     {
-
+                        struct mptcp_subflow *fwd_sf = tcpd->fwd->mptcp_subflow;
                         /* register SSN range described by the mapping into a subflow interval_tree */
                         mptcp_dss_mapping_t *mapping = NULL;
                         mapping = wmem_new0(wmem_file_scope(), mptcp_dss_mapping_t);
@@ -4010,11 +4096,18 @@ dissect_tcpopt_mptcp(const ip_tcp_opt *optp _U_, tvbuff_t *tvb,
                         mapping->ssn_low = mph->mh_dss_ssn;
                         mapping->ssn_high = mph->mh_dss_ssn + mph->mh_dss_length-1;
 
+                        printf("packet %d stream %d: mapping %d - %d to %lu\n", 
+                                pinfo->fd->num, tcph->th_stream,
+                                mph->mh_dss_ssn, mapping->ssn_high,
+                                mapping->rawdsn);
+                        wmem_print_itree(fwd_sf->mappings);
                         wmem_itree_insert(tcpd->fwd->mptcp_subflow->mappings,
                             mph->mh_dss_ssn,
                             mapping->ssn_high,
                             mapping
                             );
+
+                        wmem_print_itree(fwd_sf->mappings);
                     }
                 }
 

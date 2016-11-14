@@ -265,14 +265,17 @@ struct mptcp_subflow {
 	guint8 address_id;   /* sent during an MP_JOIN */
 
 
-	/* Attempt to map DSN to packets
-	 * Ideally this was to generate application latency
-	 * each node contains a GSList * ?
-	 * this should be done in tap or 3rd party tools
+	/* map DSN to packets
+	 * Used when looking for reinjections across subflows
+	 * TODO rename dsn2packet_mapping
 	 */
 	wmem_itree_t *dsn_map;
 
-	/* Map SSN to a DSS mappings, each node registers a mptcp_dss_mapping_t */
+	/* Map SSN to a DSS mappings
+	 * a DSS can map DSN to SSNs possibily over several packets, 
+	 * hence some packets may have been mapped by previous DSS, 
+	 * whence the necessity to be able to look for SSN -> DSN 
+	 * TODO ssn2dsn_mappings */
 	wmem_itree_t *mappings;
 	/* meta flow to which it is attached. Helps setting forward and backward meta flow */
 	mptcp_meta_flow_t *meta;
