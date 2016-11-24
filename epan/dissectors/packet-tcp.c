@@ -2421,7 +2421,8 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
 
         DISSECTOR_ASSERT(mapping);
         if(seglen) {
-        /* display packets that conveyed the mappings covering the data range */
+        /* display packets that conveyed the mappings covering the data range 
+         * TODO remove : not used anymoe */
             mptcp_add_matching_dss_on_subflow(pinfo, parent_tree, tvb,
                 results
                             /* tcpd->fwd->mptcp_subflow, ssn_low, */
@@ -2451,31 +2452,42 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
             proto_item_append_text(item, " (Relative)");
         }
 
-        /* register */
-        if (!PINFO_FD_VISITED(pinfo) )
+        /* register dsn -> packet mapping */
+        /* if (!PINFO_FD_VISITED(pinfo) */ 
+        /*         && */ 
+        /*        mph->mh_dss_length */
+        /*        ) */
+
+        if(mptcp_intersubflows_retransmission 
+                && !PINFO_FD_VISITED(pinfo)
+                && tcph->th_seglen > 0
+          )
+                /* tcph->th_mptcp->mh_dss_length) */
         {
-            mptcp_dsn2packet_mapping_t *packet = 0;
-            struct mptcp_subflow *fwd_sf = tcpd->fwd->mptcp_subflow;
-            packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
-            packet->frame = pinfo->fd->num;
-            packet->subflow = tcpd; /* TODO do we need/use  it ? */
+            /* if (!PINFO_FD_VISITED(pinfo) ) { */
+                    mptcp_dsn2packet_mapping_t *packet = 0;
+                    struct mptcp_subflow *fwd_sf = tcpd->fwd->mptcp_subflow;
+                    packet = wmem_new0(wmem_file_scope(), mptcp_dsn2packet_mapping_t);
+                    packet->frame = pinfo->fd->num;
+                    packet->subflow = tcpd; /* TODO do we need/use  it ? */
 
-            /* tcph->th_mptcp->mh_rawdsn64 */
-            if (tcph->th_have_seglen) {
-                printf("Adding to dsn_map of stream %d [%lu - %lu]\n", tcph->th_stream,
-                        tcph->th_mptcp->mh_rawdsn64,
-                        tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ));
+                /* tcph->th_mptcp->mh_rawdsn64 */
+                /* if (tcph->th_have_seglen) { */
+                    printf("Adding to dsn_map of stream %d [%lu - %lu]\n", tcph->th_stream,
+                            tcph->th_mptcp->mh_rawdsn64,
+                            tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ));
 
-                /* wmem_print_itree(subflow->dsn_map); */
-                wmem_print_itree(fwd_sf->dsn_map);
-                wmem_itree_insert(tcpd->fwd->mptcp_subflow->dsn_map,
-                        tcph->th_mptcp->mh_rawdsn64,
-                        tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ),
-                        packet
-                        );
+                    /* wmem_print_itree(subflow->dsn_map); */
+                    wmem_print_itree(fwd_sf->dsn_map);
+                    wmem_itree_insert(tcpd->fwd->mptcp_subflow->dsn_map,
+                            tcph->th_mptcp->mh_rawdsn64,
+                            tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ),
+                            packet
+                            );
 
-                wmem_print_itree(fwd_sf->dsn_map);
-            }
+                    wmem_print_itree(fwd_sf->dsn_map);
+                /* } */
+            /* } */
         }
         PROTO_ITEM_SET_GENERATED(item);
 
@@ -2486,6 +2498,7 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
 
             wmem_list_frame_t *subflow_it = NULL;
 
+            printf("Searching for duplicates in subflow %lu\n", tcph->th_mptcp->mh_rawdsn64) ; // , subflow_it->
             /* results should be some kind of  in case 2 DSS are needed to cover this packet */
             for(subflow_it = wmem_list_head(mptcpd->subflows); subflow_it != NULL; subflow_it = wmem_list_frame_next(subflow_it)) {
                 struct tcp_analysis *sf_tcpd = (struct tcp_analysis *)wmem_list_frame_data(subflow_it);
