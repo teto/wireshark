@@ -7617,8 +7617,8 @@ proto_register_tcp(void)
         &mptcp_relative_seq);
 
     prefs_register_bool_preference(mptcp_module, "analyze_mappings",
-        "In depth analysis of Data Sequence Signal (DSS) mappings."
-        "Scales logarithmically with the number of packets",
+        "Deeper analysis of Data Sequence Signal (DSS)",
+        "Scales logarithmically with the number of packets"
         "You need to capture the handshake for this to work."
         "\"Map TCP subflows to their respective MPTCP connections\"",
         &mptcp_analyze_mappings);
