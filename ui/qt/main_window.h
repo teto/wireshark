@@ -594,11 +594,13 @@ private slots:
     void on_actionStatisticsProtocolHierarchy_triggered();
     void on_actionStatisticsFlowGraph_triggered();
     void openTcpStreamDialog(int graph_type);
+    void openMpTcpStreamDialog(int graph_type);
     void on_actionStatisticsTcpStreamStevens_triggered();
     void on_actionStatisticsTcpStreamTcptrace_triggered();
     void on_actionStatisticsTcpStreamThroughput_triggered();
     void on_actionStatisticsTcpStreamRoundTripTime_triggered();
     void on_actionStatisticsTcpStreamWindowScaling_triggered();
+    void on_actionStatisticsMpTcpStreamThroughput_triggered();
     void openSCTPAllAssocsDialog();
     void on_actionSCTPShowAllAssociations_triggered();
     void on_actionSCTPAnalyseThisAssociation_triggered();

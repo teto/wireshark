@@ -7624,9 +7624,9 @@ proto_register_tcp(void)
         &mptcp_analyze_mappings);
 
     prefs_register_bool_preference(mptcp_module, "intersubflows_retransmission",
-        "Check for data duplication across subflows"
+        "Check for data duplication across subflows",
         "(Greedy algorithm: Scales linearly with number of subflows and"
-        " logarithmic scaling with number of packets)",
+        " logarithmic scaling with number of packets)"
         "You need to enable DSS mapping analysis for this option to work",
         &mptcp_intersubflows_retransmission);
 

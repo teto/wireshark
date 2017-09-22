@@ -147,6 +147,7 @@ DIAG_ON(frame-larger-than=)
 #include "supported_protocols_dialog.h"
 #include "tap_parameter_dialog.h"
 #include "tcp_stream_dialog.h"
+#include "mptcp_stream_dialog.h"
 #include "time_shift_dialog.h"
 #include "uat_dialog.h"
 #include "voip_calls_dialog.h"
@@ -3108,6 +3109,18 @@ void MainWindow::openTcpStreamDialog(int graph_type)
     }
 }
 
+void MainWindow::openMpTcpStreamDialog(int graph_type)
+{
+    TCPStreamDialog *stream_dialog = new MPTCPStreamDialog(this, capture_file_.capFile(), (tcp_graph_type)graph_type);
+    connect(stream_dialog, SIGNAL(goToPacket(int)),
+            packet_list_, SLOT(goToPacket(int)));
+    connect(this, SIGNAL(setCaptureFile(capture_file*)),
+            stream_dialog, SLOT(setCaptureFile(capture_file*)));
+    if (stream_dialog->result() == QDialog::Accepted) {
+        stream_dialog->show();
+    }
+}
+
 void MainWindow::on_actionStatisticsTcpStreamStevens_triggered()
 {
     openTcpStreamDialog(GRAPH_TSEQ_STEVENS);
@@ -3131,6 +3144,11 @@ void MainWindow::on_actionStatisticsTcpStreamRoundTripTime_triggered()
 void MainWindow::on_actionStatisticsTcpStreamWindowScaling_triggered()
 {
     openTcpStreamDialog(GRAPH_WSCALE);
+}
+
+void MainWindow::on_actionStatisticsMpTcpStreamThroughput_triggered()
+{
+    openMpTcpStreamDialog(GRAPH_THROUGHPUT);
 }
 
 // -z mcast,stat

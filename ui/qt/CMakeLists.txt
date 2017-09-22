@@ -424,6 +424,7 @@ set(WIRESHARK_QT_SRC
 	tabnav_tree_widget.cpp
 	tap_parameter_dialog.cpp
 	tcp_stream_dialog.cpp
+	mptcp_stream_dialog.cpp
 	time_shift_dialog.cpp
 	traffic_table_dialog.cpp
 	uat_dialog.cpp
@@ -541,6 +542,7 @@ set(WIRESHARK_QT_UI
 	supported_protocols_dialog.ui
 	tap_parameter_dialog.ui
 	tcp_stream_dialog.ui
+	mptcp_stream_dialog.ui
 	time_shift_dialog.ui
 	traffic_table_dialog.ui
 	uat_dialog.ui
