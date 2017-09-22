@@ -126,7 +126,7 @@
      <widget class="FilterExpressionFrame" name="filterExpressionFrame"/>
     </item>
     <item>
-     <widget class="WirelessTimeline" name="wirelessTimelineWidget"/>
+     <widget class="WirelessTimeline" name="wirelessTimelineWidget" native="true"/>
     </item>
     <item>
      <widget class="QStackedWidget" name="mainStack">
@@ -144,7 +144,7 @@
      <x>0</x>
      <y>0</y>
      <width>960</width>
-     <height>23</height>
+     <height>19</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -354,7 +354,7 @@
     <addaction name="actionViewFilterToolbar"/>
     <addaction name="actionViewWirelessToolbar"/>
     <addaction name="menuInterfaceToolbars"/>
-    <addaction name="menuAdditionalToolbars" />
+    <addaction name="menuAdditionalToolbars"/>
     <addaction name="actionViewStatusBar"/>
     <addaction name="separator"/>
     <addaction name="actionViewFullScreen"/>
@@ -525,6 +525,12 @@
       <string>Service Response Time</string>
      </property>
     </widget>
+    <widget class="QMenu" name="menuMPTCP_Stream_Graphs">
+     <property name="title">
+      <string>MPTCP Stream Graphs</string>
+     </property>
+     <addaction name="actionThroughput"/>
+    </widget>
     <addaction name="actionStatisticsCaptureFileProperties"/>
     <addaction name="actionStatisticsResolvedAddresses"/>
     <addaction name="actionStatisticsProtocolHierarchy"/>
@@ -548,6 +554,7 @@
     <addaction name="actionStatisticsSametime"/>
     <addaction name="menuTcpStreamGraphs"/>
     <addaction name="actionStatisticsUdpMulticastStreams"/>
+    <addaction name="menuMPTCP_Stream_Graphs"/>
    </widget>
    <widget class="QMenu" name="menuTelephony">
     <property name="title">
@@ -2995,6 +3002,11 @@
    </property>
    <property name="text">
     <string>&amp;Full Screen</string>
+   </property>
+  </action>
+  <action name="actionThroughput">
+   <property name="text">
+    <string>Throughput</string>
    </property>
   </action>
  </widget>

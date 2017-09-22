@@ -19,8 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "tcp_stream_dialog.h"
-#include <ui_tcp_stream_dialog.h>
+#include "mptcp_stream_dialog.h"
+#include <ui_mptcp_stream_dialog.h>
 
 #include <algorithm> // for std::sort
 #include <utility> // for std::pair
@@ -67,31 +67,32 @@ const QString time_s_label_ = QObject::tr("Time (s)");
 const QString window_size_label_ = QObject::tr("Window Size (B)");
 
 MPTCPStreamDialog::MPTCPStreamDialog(QWidget *parent, capture_file *cf, tcp_graph_type graph_type) :
-    QDialog(NULL, Qt::Window),
-    ui(new Ui::MPTCPStreamDialog),
-    cap_file_(cf),
-    ts_offset_(0),
-    ts_origin_conn_(true),
-    seq_offset_(0),
-    seq_origin_zero_(true),
-    title_(NULL),
-    base_graph_(NULL),
-    tput_graph_(NULL),
-    goodput_graph_(NULL),
-    seg_graph_(NULL),
-    ack_graph_(NULL),
-    sack_graph_(NULL),
-    sack2_graph_(NULL),
-    rwin_graph_(NULL),
-    tracer_(NULL),
-    packet_num_(0),
-    mouse_drags_(true),
-    rubber_band_(NULL),
-    graph_updater_(this),
-    num_dsegs_(-1),
-    num_acks_(-1),
-    num_sack_ranges_(-1),
-    ma_window_size_(1.0)
+    TCPStreamDialog(parent, cf, graph_type),
+    /* QDialog(NULL, Qt::Window), */
+    ui(new Ui::MPTCPStreamDialog)
+    /* cap_file_(cf), */
+    /* ts_offset_(0), */
+    /* ts_origin_conn_(true), */
+    /* seq_offset_(0), */
+    /* seq_origin_zero_(true), */
+    /* title_(NULL), */
+    /* base_graph_(NULL), */
+    /* tput_graph_(NULL), */
+    /* goodput_graph_(NULL), */
+    /* seg_graph_(NULL), */
+    /* ack_graph_(NULL), */
+    /* sack_graph_(NULL), */
+    /* sack2_graph_(NULL), */
+    /* rwin_graph_(NULL), */
+    /* tracer_(NULL), */
+    /* packet_num_(0), */
+    /* mouse_drags_(true), */
+    /* rubber_band_(NULL), */
+    /* graph_updater_(this), */
+    /* num_dsegs_(-1), */
+    /* num_acks_(-1), */
+    /* num_sack_ranges_(-1), */
+    /* ma_window_size_(1.0) */
 {
     struct segment current;
     int graph_idx = -1;
@@ -177,10 +178,10 @@ MPTCPStreamDialog::MPTCPStreamDialog(QWidget *parent, capture_file *cf, tcp_grap
 
     showWidgetsForGraphType();
 
-    ui->streamNumberSpinBox->blockSignals(true);
-    ui->streamNumberSpinBox->setMaximum(get_tcp_stream_count() - 1);
-    ui->streamNumberSpinBox->setValue(graph_.stream);
-    ui->streamNumberSpinBox->blockSignals(false);
+    /* ui->streamNumberSpinBox->blockSignals(true); */
+    ui->streamNumberSpinBox->setMaximum(get_mptcp_stream_count() - 1);
+    /* ui->streamNumberSpinBox->setValue(graph_.stream); */
+    /* ui->streamNumberSpinBox->blockSignals(false); */
 
 #ifdef MA_1_SECOND
     ui->maWindowSizeSpinBox->blockSignals(true);

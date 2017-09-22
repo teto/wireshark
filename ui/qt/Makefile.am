@@ -113,6 +113,7 @@ NODIST_GENERATED_HEADER_FILES = \
 	ui_supported_protocols_dialog.h			\
 	ui_tap_parameter_dialog.h			\
 	ui_tcp_stream_dialog.h				\
+	ui_mptcp_stream_dialog.h			\
 	ui_time_shift_dialog.h				\
 	ui_traffic_table_dialog.h			\
 	ui_uat_dialog.h					\
@@ -645,6 +646,7 @@ WIRESHARK_QT_SRC = \
 	tabnav_tree_widget.cpp				\
 	tap_parameter_dialog.cpp			\
 	tcp_stream_dialog.cpp				\
+	mptcp_stream_dialog.cpp				\
 	time_shift_dialog.cpp				\
 	traffic_table_dialog.cpp			\
 	uat_dialog.cpp					\
@@ -955,6 +957,8 @@ supported_protocols_dialog.$(OBJEXT): ui_supported_protocols_dialog.h
 tap_parameter_dialog.$(OBJEXT): ui_tap_parameter_dialog.h
 
 tcp_stream_dialog.$(OBJEXT): ui_tcp_stream_dialog.h
+
+mptcp_stream_dialog.$(OBJEXT): ui_mptcp_stream_dialog.h
 
 time_shift_dialog.$(OBJEXT): ui_time_shift_dialog.h
 
