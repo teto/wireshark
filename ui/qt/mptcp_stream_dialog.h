@@ -54,15 +54,16 @@ public:
 signals:
     void goToPacket(int packet_num);
 
-public slots:
-    void setCaptureFile(capture_file *cf);
-    void updateGraph();
+/* public slots: */
+    // can it be inherited
+    /* void setCaptureFile(capture_file *cf); */
+    /* void updateGraph(); */
 
-protected:
-    void showEvent(QShowEvent *event);
-    void keyPressEvent(QKeyEvent *event);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
+/* protected: */
+/*     void showEvent(QShowEvent *event); */
+/*     void keyPressEvent(QKeyEvent *event); */
+/*     void mousePressEvent(QMouseEvent *event); */
+/*     void mouseReleaseEvent(QMouseEvent *event); */
 
 private:
     Ui::MPTCPStreamDialog *ui;

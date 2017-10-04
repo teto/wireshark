@@ -11,8 +11,8 @@ FIND_PROGRAM(A2X_EXECUTABLE
     PATHS
         ${CYGWIN_INSTALL_PATH}/bin
         /bin
-        /usr/bin
-        /usr/local/bin
+        /var/empty/bin
+        /var/empty/local/bin
         /sbin
 )
 
@@ -39,9 +39,9 @@ if (NOT "${CYGWIN_INSTALL_PATH}" STREQUAL "" AND "${l_a2x_ex}" MATCHES "${l_cyg_
 
     TO_A2X_COMPATIBLE_PATH( ${CMAKE_SOURCE_DIR}/tools/runa2x.sh RUNA2X_CYGWIN_PATH )
 
-    # It's difficult or impossible to call /usr/bin/a2x directly from
+    # It's difficult or impossible to call /var/empty/bin/a2x directly from
     # Windows because:
-    # - /usr/bin/a2x, which is a symlink to /usr/bin/a2x.py.
+    # - /var/empty/bin/a2x, which is a symlink to /var/empty/bin/a2x.py.
     # - We need to set environment variables (LC_ALL, PATH, TZ, PYTHONHOME)
     # so we use a wrapper script.
     set( RUNA2X ${SH_EXECUTABLE} ${RUNA2X_CYGWIN_PATH} )
