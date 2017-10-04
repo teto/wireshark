@@ -3111,7 +3111,7 @@ void MainWindow::openTcpStreamDialog(int graph_type)
 
 void MainWindow::openMpTcpStreamDialog(int graph_type)
 {
-    TCPStreamDialog *stream_dialog = new MPTCPStreamDialog(this, capture_file_.capFile(), (tcp_graph_type)graph_type);
+    MPTCPStreamDialog *stream_dialog = new MPTCPStreamDialog(this, capture_file_.capFile(), (tcp_graph_type)graph_type);
     connect(stream_dialog, SIGNAL(goToPacket(int)),
             packet_list_, SLOT(goToPacket(int)));
     connect(this, SIGNAL(setCaptureFile(capture_file*)),

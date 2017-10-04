@@ -532,7 +532,7 @@
      <property name="title">
       <string>MPTCP Stream Graphs</string>
      </property>
-     <addaction name="actionThroughput"/>
+     <addaction name="actionStatisticsMpTcpStreamThroughput"/>
     </widget>
     <addaction name="actionStatisticsCaptureFileProperties"/>
     <addaction name="actionStatisticsResolvedAddresses"/>
@@ -2990,7 +2990,7 @@
     <string>&amp;Full Screen</string>
    </property>
   </action>
-  <action name="actionThroughput">
+  <action name="actionStatisticsMpTcpStreamThroughput">
    <property name="text">
     <string>Throughput</string>
    </property>

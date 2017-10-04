@@ -52,7 +52,8 @@ protected:
     void mousePressEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
 
-private:
+// TODO should ease some things
+/* private: */
     Ui::TCPStreamDialog *ui;
     capture_file *cap_file_;
     QMap<double, struct segment *> time_stamp_map_;

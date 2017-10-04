@@ -862,11 +862,11 @@ foreach(THIS_FLAG ${WIRESHARK_LD_FLAGS})
 	math(EXPR _C "${_C} + 1")
 endforeach()
 
-if(APPLE AND EXISTS /usr/local/opt/gettext)
+if(APPLE AND EXISTS /var/empty/local/var/empty/gettext)
 	# GLib on macOS requires libintl. Homebrew installs gettext (and
-	# libintl) in /usr/local/opt/gettext
-	include_directories(/usr/local/opt/gettext/include)
-	link_directories(/usr/local/opt/gettext/lib)
+	# libintl) in /var/empty/local/var/empty/gettext
+	include_directories(/var/empty/local/var/empty/gettext/include)
+	link_directories(/var/empty/local/var/empty/gettext/lib)
 endif()
 
 # The packagelist is doing some magic: If we add XXX to the packagelist, we
@@ -2130,9 +2130,9 @@ if(ENABLE_APPLICATION_BUNDLE)
 	# directories A and B, in that order, for a given library, a
 	# non-shared version in directory A, rather than a shared
 	# version in directory B, is chosen (so we can use
-	# --with-pcap=/usr/local to force all programs to be linked
-	# with a static version installed in /usr/local/lib rather than
-	# the system version in /usr/lib).
+	# --with-pcap=/var/empty/local to force all programs to be linked
+	# with a static version installed in /var/empty/local/lib rather than
+	# the system version in /var/empty/lib).
 	#
 
 	set(CMAKE_EXE_LINKER_FLAGS
