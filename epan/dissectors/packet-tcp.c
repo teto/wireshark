@@ -7435,7 +7435,7 @@ proto_register_tcp(void)
 
         { &hf_mptcp_reinjection_of,
           { "Reinjection of", "mptcp.reinjection", FT_FRAMENUM , BASE_NONE, NULL, 0x0,
-            "This was retransmitted on another subflow", HFILL }},
+            "This is a retransmission of data sent on another subflow", HFILL }},
 
         { &hf_mptcp_reinjected_in,
           { "Data reinjected in", "mptcp.reinjection_listing", FT_FRAMENUM , BASE_NONE, NULL, 0x0,
