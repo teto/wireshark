@@ -126,7 +126,8 @@ protected:
     void toggleTracerStyle(bool force_default = false);
     QRectF getZoomRanges(QRect zoom_rect);
 
-private slots:
+/* private slots: */
+protected slots:
     void graphClicked(QMouseEvent *event);
     void axisClicked(QCPAxis *axis, QCPAxis::SelectablePart part, QMouseEvent *event);
     void mouseMoved(QMouseEvent *event);

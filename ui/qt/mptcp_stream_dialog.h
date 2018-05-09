@@ -118,7 +118,7 @@ private:
     /* double ma_window_size_; */
 
     /* void findStream(); */
-    /* void fillGraph(bool reset_axes = true, bool set_focus = true); */
+    void fillGraph(bool reset_axes = true, bool set_focus = true);
     /* void showWidgetsForGraphType(); */
     /* void zoomAxes(bool in); */
     /* void zoomXAxis(bool in); */
@@ -127,7 +127,7 @@ private:
     /* void resetAxes(); */
     /* void fillStevens(); */
     /* void fillTcptrace(); */
-    /* void fillThroughput(); */
+    void fillThroughput();
     /* void fillRoundTripTime(); */
     /* void fillWindowScale(); */
     /* QString streamDescription(); */

@@ -45,6 +45,14 @@
 
 #include <QDebug>
 
+// The GTK+ version computes a 20 (or 21!) segment moving average. Comment
+// out the line below to use that. By default we use a 1 second MA.
+#define MA_1_SECOND
+
+#ifndef MA_1_SECOND
+const int moving_avg_period_ = 20;
+#endif
+
 
 const QRgb graph_color_1 = tango_sky_blue_5;
 const QRgb graph_color_2 = tango_butter_6;
@@ -209,7 +217,7 @@ MPTCPStreamDialog::MPTCPStreamDialog(QWidget *parent, capture_file *cf, tcp_grap
 /*     ui->showBytesOutCheckBox->setChecked(true); */
 /*     ui->showBytesOutCheckBox->blockSignals(false); */
 
-/*     QCustomPlot *sp = ui->streamPlot; */
+    QCustomPlot *sp = ui->streamPlot;
 /*     QCPPlotTitle *file_title = new QCPPlotTitle(sp, cf_get_display_name(cap_file_)); */
 /*     file_title->setFont(sp->xAxis->labelFont()); */
 /*     title_ = new QCPPlotTitle(sp); */
@@ -295,9 +303,9 @@ MPTCPStreamDialog::MPTCPStreamDialog(QWidget *parent, capture_file *cf, tcp_grap
     connect(sp, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(graphClicked(QMouseEvent*)));
     connect(sp, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(mouseMoved(QMouseEvent*)));
     connect(sp, SIGNAL(mouseRelease(QMouseEvent*)), this, SLOT(mouseReleased(QMouseEvent*)));
-    connect(sp, SIGNAL(axisClick(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)),
-            this, SLOT(axisClicked(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)));
-    connect(sp->yAxis, SIGNAL(rangeChanged(QCPRange)), this, SLOT(transformYRange(QCPRange)));
+    /* connect(sp, SIGNAL(axisClick(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)), */
+    /*         this, SLOT(axisClicked(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*))); */
+    /* connect(sp->yAxis, SIGNAL(rangeChanged(QCPRange)), this, SLOT(transformYRange(QCPRange))); */
     disconnect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
     this->setResult(QDialog::Accepted);
 }
