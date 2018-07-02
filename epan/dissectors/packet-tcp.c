@@ -2617,19 +2617,33 @@ guint64 rawdsn64low, guint64 rawdsn64high
     mptcp_dsn2packet_mapping_t *packet = NULL;
     proto_item *item = NULL;
 
+    if (pinfo->num == 1170)
+        printf("Looking for sthg between loa %lu and %lu", rawdsn64low, rawdsn64high);
+
     results = wmem_itree_find_intervals(subflow->dsn2packet_map,
                     wmem_packet_scope(),
                     rawdsn64low,
                     rawdsn64high
                     );
 
-    for(packet_it=wmem_list_head(results);
+    packet_it = wmem_list_head(results);
+
+    if (pinfo->num == 1170) {
+        printf("HIT add_duplicated_dsn, results ? %d\n", packet_it != 0);
+
+        wmem_print_itree(subflow->dsn2packet_map);
+    }
+
+    for(packet_it = wmem_list_head(results);
         packet_it != NULL;
         packet_it = wmem_list_frame_next(packet_it))
     {
 
         packet = (mptcp_dsn2packet_mapping_t *) wmem_list_frame_data(packet_it);
         DISSECTOR_ASSERT(packet);
+
+        if (pinfo->num == 1170)
+            printf("found packet %p\n", packet);
 
         if(pinfo->num > packet->frame) {
             item = proto_tree_add_uint(tree, hf_mptcp_reinjection_of, tvb, 0, 0, packet->frame);
@@ -2664,6 +2678,11 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
         return;
     }
 
+    if (pinfo->num == 1170)
+        printf("launching analysis");
+    /* else */
+    /*     printf("packet number %d", pinfo->num); */
+
     /* for this to work, we need to know the original seq number from the SYN, not from a subsequent packet
     * hence, we abort if we didn't capture the SYN
     */
@@ -2689,7 +2708,7 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
         rawdsn = tcpd->fwd->mptcp_subflow->meta->base_dsn + 1;
         convert = DSN_CONV_NONE;
     }
-    else  {
+    else {
 
         wmem_list_frame_t *dss_it = NULL;
         wmem_list_t *results = NULL;
@@ -2756,6 +2775,9 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
                 packet->frame = pinfo->fd->num;
                 packet->subflow = tcpd;
 
+                if (pinfo->num == 1170)
+                    printf("insert %ld", tcph->th_mptcp->mh_rawdsn64);
+
                 wmem_itree_insert(tcpd->fwd->mptcp_subflow->dsn2packet_map,
                         tcph->th_mptcp->mh_rawdsn64,
                         tcph->th_mptcp->mh_rawdsn64 + (tcph->th_seglen - 1 ),
@@ -2771,6 +2793,8 @@ mptcp_analysis_dsn_lookup(packet_info *pinfo , tvbuff_t *tvb,
             && tcph->th_seglen) {
 
             wmem_list_frame_t *subflow_it = NULL;
+            if (pinfo->num == 1170)
+                printf("toto_dsn\n");
 
             /* results should be some kind of list in case 2 DSS are needed to cover this packet */
             for(subflow_it = wmem_list_head(mptcpd->subflows); subflow_it != NULL; subflow_it = wmem_list_frame_next(subflow_it)) {
