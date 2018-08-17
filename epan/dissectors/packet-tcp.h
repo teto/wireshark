@@ -331,6 +331,9 @@ typedef struct _tcp_flow_t {
 	guint32 push_bytes_sent; /* bytes since the last PSH flag */
 	gboolean push_set_last; /* tracking last time PSH flag was set */
 
+        guint32 syn_tsval;     /* support for TS extended */
+        /* guint32 tsextended;     /1* support for TS extended *1/ */
+
 	tcp_analyze_seq_flow_info_t* tcp_analyze_seq_info;
 
 /* This tcp flow/session contains only one single PDU and should

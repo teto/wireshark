@@ -202,6 +202,8 @@ static int hf_tcp_option_sack_range_count = -1;
 static int hf_tcp_option_echo = -1;
 static int hf_tcp_option_timestamp_tsval = -1;
 static int hf_tcp_option_timestamp_tsecr = -1;
+static int hf_tcp_option_timestamp_tsecr_corrected = -1;
+static int hf_tcp_option_timestamp_tsextended = -1;
 static int hf_tcp_option_cc = -1;
 static int hf_tcp_option_md5_digest = -1;
 static int hf_tcp_option_qs_rate = -1;
@@ -4203,7 +4205,7 @@ dissect_tcpopt_echo(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
 static gboolean tcp_ignore_timestamps = FALSE;
 
 static int
-dissect_tcpopt_timestamp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+dissect_tcpopt_timestamp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
     proto_item *ti;
     proto_tree *ts_tree;
@@ -4211,6 +4213,11 @@ dissect_tcpopt_timestamp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     int offset = 0;
     guint32 ts_val, ts_ecr;
     int len = tvb_reported_length(tvb);
+
+    struct tcpheader *tcph = (struct tcpheader *)data;
+
+    struct tcp_analysis *tcpd;
+    tcpd=get_tcp_conversation_data(NULL,pinfo);
 
     ti = proto_tree_add_item(tree, proto_tcp_option_timestamp, tvb, offset, -1, ENC_NA);
     ts_tree = proto_item_add_subtree(ti, ett_tcp_option_timestamp);
@@ -4236,6 +4243,26 @@ dissect_tcpopt_timestamp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     if (tcp_ignore_timestamps == FALSE) {
         tcp_info_append_uint(pinfo, "TSval", ts_val);
         tcp_info_append_uint(pinfo, "TSecr", ts_ecr);
+    }
+
+    if(tcph->th_flags & TH_SYN) {
+        guint32 enabled = 0;
+        if((tcph->th_flags & TH_ACK) == 0) {
+            /* printf("Saw syn in pkt %u\n", pinfo->fd->num); */
+            tcpd->fwd->syn_tsval = ts_val;
+            enabled = ts_ecr & (1 << 31);
+        } else if (tcpd->rev->static_flags & TCP_S_SAW_SYN) {
+            /* printf("Saw syn/ack in pkt %u\n", pinfo->fd->num); */
+            ts_ecr ^= (tcpd->rev->syn_tsval);
+            enabled = ts_ecr & (1 << 31);
+            /* print it as bitfield */
+            proto_tree_add_uint(ts_tree, hf_tcp_option_timestamp_tsecr_corrected, tvb, offset,
+                        4, );
+        }
+        /* printf("Enabled %u\n", enabled); */
+        proto_item *item = proto_tree_add_boolean(ts_tree, hf_tcp_option_timestamp_tsextended,
+                tvb, offset , 1, enabled);
+        PROTO_ITEM_SET_GENERATED(item);
     }
 
     return tvb_captured_length(tvb);
@@ -7070,6 +7097,18 @@ proto_register_tcp(void)
         { &hf_tcp_option_timestamp_tsecr,
           { "Timestamp echo reply", "tcp.options.timestamp.tsecr", FT_UINT32,
             BASE_DEC, NULL, 0x0, "Echoed timestamp from remote machine", HFILL}},
+
+        { &hf_tcp_option_timestamp_tsecr_corrected,
+          { "Corrected timestamp echo reply", "tcp.options.timestamp.tsecr_corrected", FT_UINT32,
+/* BASE_DEC_HEX */
+            BASE_DEC, NULL, 0x0, "Timestamp from remote machine after xoring with syn tsval.", HFILL}},
+
+        { &hf_tcp_option_timestamp_tsextended,
+          { "Extended timestamp",
+            "tcp.options.timestamp.extended", FT_BOOLEAN, BASE_NONE,
+            /* TFS(&tfs_set_notset), */
+            NULL,
+            0x0, NULL, HFILL }},
 
         { &hf_tcp_option_mptcp_subtype,
           { "Multipath TCP subtype", "tcp.options.mptcp.subtype", FT_UINT8,
