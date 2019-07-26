@@ -15,6 +15,7 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <stdio.h>
 #include "packet-netlink.h"
 
 /*
@@ -78,6 +79,7 @@ enum ws_genl_ctrl_group_attr {
 
 #define WS_GENL_ID_CTRL 0x10
 #define GENL_CTRL_NAME "nlctrl"
+#define GENL_MPTCP_NAME "mptcp"
 
 static const value_string genl_ctrl_cmds[] = {
 	{ WS_CTRL_CMD_UNSPEC,           "CTRL_CMD_UNSPEC" },
@@ -366,6 +368,7 @@ dissect_genl_ctrl(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree _U_, v
 
 	offset = dissect_genl_header(tvb, genl_info, &hfi_genl_ctrl_cmd);
 
+	// ett_tree / ett_attr
 	dissect_netlink_attributes(tvb, &hfi_genl_ctrl_attr, ett_genl_ctrl_attr, &info, info.data, genl_info->genl_tree, offset, -1, dissect_genl_ctrl_attrs);
 
 	/*
@@ -459,9 +462,19 @@ dissect_netlink_generic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
 	/* No subdissector added the genl header, do it now. */
 	offset = dissect_genl_header(next_tvb, &info, NULL);
-	if (tvb_reported_length_remaining(tvb, offset)) {
-		next_tvb = tvb_new_subset_remaining(tvb, offset);
-		call_data_dissector(next_tvb, pinfo, tree);
+	gint len = tvb_reported_length_remaining(next_tvb, offset);
+	if (len) {
+		next_tvb = tvb_new_subset_remaining(next_tvb, offset);
+		// returns a length
+		/* call_data_dissector(next_tvb, pinfo, tree); */
+
+		printf("Length = %d offset=%d\n", len, offset);
+		// tvb_get_string_bytes
+		printf("no family name %s\n", tvb_bytes_to_str(wmem_file_scope(), next_tvb, 0, len));
+
+		/* genl_info_t *genl_info = (genl_info_t *) data; */
+		/* might need to disable dissect_genl_ctrl_attrs */
+		dissect_netlink_attributes(next_tvb, &hfi_genl_ctrl_attr, ett_netlink_generic, &info, info.data, info.genl_tree, 0, -1, dissect_genl_ctrl_attrs);
 	}
 
 	return offset;

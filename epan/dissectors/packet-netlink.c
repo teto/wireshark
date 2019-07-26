@@ -16,6 +16,7 @@
 #include <epan/packet.h>
 #include <epan/arptypes.h>
 #include <wiretap/wtap.h>
+#include <stdio.h>
 
 #include "packet-netlink.h"
 
@@ -243,7 +244,6 @@ dissect_netlink_attributes_common(tvbuff_t *tvb, header_field_info *hfi_type, in
 	DISSECTOR_ASSERT(nl_data);
 
 	encoding = nl_data->encoding;
-
 	/* align to 4 */
 	offset += padding;
 	if (length == -1) {
@@ -260,6 +260,7 @@ dissect_netlink_attributes_common(tvbuff_t *tvb, header_field_info *hfi_type, in
 
 		rta_len = tvb_get_guint16(tvb, offset, encoding);
 		if (rta_len < 4) {
+
 			/* XXX invalid expert */
 			break;
 		}
