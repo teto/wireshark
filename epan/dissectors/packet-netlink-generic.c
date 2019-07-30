@@ -77,9 +77,62 @@ enum ws_genl_ctrl_group_attr {
 	WS_CTRL_ATTR_MCAST_GRP_ID,
 };
 
+/* from */
+enum ws_genl_mptcp_attr {
+	WS_MPTCP_ATTR_UNSPEC,
+	WS_MPTCP_ATTR_TOKEN,
+	WS_MPTCP_ATTR_FAMILY,
+	WS_MPTCP_ATTR_LOC_ID,
+	WS_MPTCP_ATTR_REM_ID,
+	WS_MPTCP_ATTR_SADDR4,
+	WS_MPTCP_ATTR_SADDR6,
+	WS_MPTCP_ATTR_DADDR4,
+	WS_MPTCP_ATTR_DADDR6,
+	WS_MPTCP_ATTR_SPORT,
+	WS_MPTCP_ATTR_DPORT,
+	WS_MPTCP_ATTR_BACKUP,
+	WS_MPTCP_ATTR_ERROR,
+	WS_MPTCP_ATTR_FLAGS,
+	WS_MPTCP_ATTR_TIMEOUT,
+	WS_MPTCP_ATTR_IF_IDX
+};
+
+static const value_string genl_mptcp_attr_vals[] = {
+	{ WS_MPTCP_ATTR_UNSPEC, "Unspec" },
+	{ WS_MPTCP_ATTR_TOKEN, "Token" },
+	{ WS_MPTCP_ATTR_FAMILY, "Address Family" },
+	{ WS_MPTCP_ATTR_LOC_ID, "Local id" },
+	{ WS_MPTCP_ATTR_REM_ID, "Remote id" },
+	{ WS_MPTCP_ATTR_SADDR4, "Source Address v4" },
+	{ WS_MPTCP_ATTR_SADDR6, "Source Address v4" },
+	{ WS_MPTCP_ATTR_DADDR4, "Destination Address v4" },
+	{ WS_MPTCP_ATTR_DADDR6, "Destination Address v6" },
+	{ WS_MPTCP_ATTR_SPORT, "Source port" },
+	{ WS_MPTCP_ATTR_DPORT, "Destination port" },
+	{ WS_MPTCP_ATTR_BACKUP, "Backup" },
+	{ WS_MPTCP_ATTR_ERROR, "Error" },
+	{ WS_MPTCP_ATTR_FLAGS, "Flags" },
+	{ WS_MPTCP_ATTR_TIMEOUT, "Timeout" },
+	{ WS_MPTCP_ATTR_IF_IDX, "Interface idx" },
+	{ 0, NULL }
+};
+/* static const value_string genl_mptcp_cmds[] = { */
+/* 	{ WS_CTRL_CMD_UNSPEC,           "CTRL_CMD_UNSPEC" }, */
+/* 	{ WS_CTRL_CMD_NEWFAMILY,        "CTRL_CMD_NEWFAMILY" }, */
+/* 	{ WS_CTRL_CMD_DELFAMILY,        "CTRL_CMD_DELFAMILY" }, */
+/* 	{ WS_CTRL_CMD_GETFAMILY,        "CTRL_CMD_GETFAMILY" }, */
+/* 	{ WS_CTRL_CMD_NEWOPS,           "CTRL_CMD_NEWOPS" }, */
+/* 	{ WS_CTRL_CMD_DELOPS,           "CTRL_CMD_DELOPS" }, */
+/* 	{ WS_CTRL_CMD_GETOPS,           "CTRL_CMD_GETOPS" }, */
+/* 	{ WS_CTRL_CMD_NEWMCAST_GRP,     "CTRL_CMD_NEWMCAST_GRP" }, */
+/* 	{ WS_CTRL_CMD_DELMCAST_GRP,     "CTRL_CMD_DELMCAST_GRP" }, */
+/* 	{ WS_CTRL_CMD_GETMCAST_GRP,     "CTRL_CMD_GETMCAST_GRP" }, */
+/* 	{ 0, NULL } */
+/* }; */
+
+
 #define WS_GENL_ID_CTRL 0x10
 #define GENL_CTRL_NAME "nlctrl"
-#define GENL_MPTCP_NAME "mptcp"
 
 static const value_string genl_ctrl_cmds[] = {
 	{ WS_CTRL_CMD_UNSPEC,           "CTRL_CMD_UNSPEC" },
@@ -286,6 +339,28 @@ static header_field_info hfi_genl_ctrl_ops_attr NETLINK_GENERIC_HFI_INIT =
 static header_field_info hfi_genl_ctrl_groups_attr NETLINK_GENERIC_HFI_INIT =
 	{ "Type", "genl.ctrl.groups_attr", FT_UINT16, BASE_DEC,
 	  VALS(genl_ctrl_group_attr_vals), NLA_TYPE_MASK, NULL, HFILL };
+
+
+/* inspired by dissect_genl_ctrl_attrs */
+static int
+dissect_genl_mptcp_attrs(tvbuff_t *tvb, void *data, proto_tree *tree, int nla_type, int offset, int len)
+{
+	enum ws_genl_ctrl_attr type = (enum ws_genl_ctrl_attr) nla_type;
+	genl_ctrl_info_t *info = (genl_ctrl_info_t *) data;
+	guint32 value;
+
+	switch (type) {
+	case WS_MPTCP_ATTR_UNSPEC:
+		break;
+	case WS_MPTCP_ATTR_IF_IDX:
+		if (len == 2) {
+			proto_tree_add_item_ret_uint(tree, &hfi_genl_ctrl_family_id, tvb, offset, 2, info->encoding, &value);
+			proto_item_append_text(tree, ": %#x", value);
+			info->family_id = value;
+			offset += 2;
+		}
+		break;
+}
 
 static int
 dissect_genl_ctrl_attrs(tvbuff_t *tvb, void *data, proto_tree *tree, int nla_type, int offset, int len)
