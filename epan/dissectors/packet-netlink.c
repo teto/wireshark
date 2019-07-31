@@ -235,6 +235,9 @@ static const int *netlink_header_standard_flags[] = {
 };
 
 
+/**
+ * @param cb is in charge of decoding the data component of the LTV
+ */
 static int
 dissect_netlink_attributes_common(tvbuff_t *tvb, header_field_info *hfi_type, int ett_tree, int ett_attrib, void *data, struct packet_netlink_data *nl_data, proto_tree *tree, int offset, int length, netlink_attributes_cb_t cb)
 {

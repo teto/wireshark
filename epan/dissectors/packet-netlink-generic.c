@@ -340,26 +340,82 @@ static header_field_info hfi_genl_ctrl_groups_attr NETLINK_GENERIC_HFI_INIT =
 	{ "Type", "genl.ctrl.groups_attr", FT_UINT16, BASE_DEC,
 	  VALS(genl_ctrl_group_attr_vals), NLA_TYPE_MASK, NULL, HFILL };
 
+/* MPTCP */
+static header_field_info hfi_genl_mptcp_interface_idx NETLINK_GENERIC_HFI_INIT =
+	{ "Interface", "genl.mptcp.interface_idx", FT_INT32, BASE_DEC,
+	  NULL, 0x00, NULL, HFILL };
+
+/* HEX ? */
+static header_field_info hfi_genl_mptcp_token NETLINK_GENERIC_HFI_INIT =
+	{ "Token", "genl.mptcp.token", FT_UINT32, BASE_DEC,
+	  NULL, 0x00, "Token", HFILL };
+
+static header_field_info hfi_genl_mptcp_sport NETLINK_GENERIC_HFI_INIT =
+	{ "Source port", "genl.mptcp.sport", FT_UINT16, BASE_DEC,
+	  VALS(genl_ctrl_group_attr_vals), NLA_TYPE_MASK, NULL, HFILL };
+
+static header_field_info hfi_genl_mptcp_local_id NETLINK_GENERIC_HFI_INIT =
+	{ "Local id", "genl.mptcp.locid", FT_UINT8, BASE_DEC,
+	  NULL, 0x00, "local id", HFILL };
+
+static header_field_info hfi_genl_mptcp_attr NETLINK_GENERIC_HFI_INIT =
+	{ "Type", "genl.mptcp.attr", FT_UINT16, BASE_DEC,
+	  VALS(genl_mptcp_attr_vals), NLA_TYPE_MASK, NULL, HFILL };
+
 
 /* inspired by dissect_genl_ctrl_attrs */
 static int
 dissect_genl_mptcp_attrs(tvbuff_t *tvb, void *data, proto_tree *tree, int nla_type, int offset, int len)
 {
-	enum ws_genl_ctrl_attr type = (enum ws_genl_ctrl_attr) nla_type;
+	enum ws_genl_mptcp_attr type = (enum ws_genl_mptcp_attr) nla_type;
 	genl_ctrl_info_t *info = (genl_ctrl_info_t *) data;
 	guint32 value;
 
+	printf("Called with nla type %d of length %d\n", nla_type, len);
 	switch (type) {
-	case WS_MPTCP_ATTR_UNSPEC:
-		break;
 	case WS_MPTCP_ATTR_IF_IDX:
-		if (len == 2) {
-			proto_tree_add_item_ret_uint(tree, &hfi_genl_ctrl_family_id, tvb, offset, 2, info->encoding, &value);
-			proto_item_append_text(tree, ": %#x", value);
-			info->family_id = value;
-			offset += 2;
+		printf("interface_idx");
+		if (len == 4) {
+			/* TODO check hfi_genl_mptcp_interface_idx */
+
+			/* gint32 sval; */
+			/* proto_tree_add_item_ret_int(tree, &hfi_genl_mptcp_interface_idx, tvb, offset, 4, info->encoding, &sval); */
+			proto_tree_add_item(tree, &hfi_genl_mptcp_interface_idx, tvb, offset, 4, info->encoding);
+			/* proto_item_append_text(tree, ": %d", sval); */
+			offset += 4;
 		}
 		break;
+
+	case WS_MPTCP_ATTR_TOKEN:
+		if (len == 4) {
+			proto_tree_add_item_ret_uint(tree, &hfi_genl_mptcp_token, tvb, offset, 4, info->encoding, &value);
+			proto_item_append_text(tree, ": %u", value);
+			offset += 4;
+		}
+		break;
+
+	case WS_MPTCP_ATTR_LOC_ID:
+		proto_tree_add_item_ret_uint(tree, &hfi_genl_mptcp_local_id, tvb, offset, 1, info->encoding, &value);
+		offset++;
+		break;
+
+	case WS_MPTCP_ATTR_REM_ID:
+		/* TODO give own hfi */
+		proto_tree_add_item_ret_uint(tree, &hfi_genl_mptcp_local_id, tvb, offset, 1, info->encoding, &value);
+		offset++;
+		break;
+
+	case WS_MPTCP_ATTR_SPORT:
+		if (len == 2) {
+			proto_tree_add_item_ret_uint(tree, &hfi_genl_mptcp_sport, tvb, offset, 2, info->encoding, &value);
+			proto_item_append_text(tree, ": %u", value);
+			offset += 2;
+		}
+	case WS_MPTCP_ATTR_UNSPEC:
+	default:
+		break;
+	}
+	return offset;
 }
 
 static int
@@ -549,7 +605,7 @@ dissect_netlink_generic(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
 		/* genl_info_t *genl_info = (genl_info_t *) data; */
 		/* might need to disable dissect_genl_ctrl_attrs */
-		dissect_netlink_attributes(next_tvb, &hfi_genl_ctrl_attr, ett_netlink_generic, &info, info.data, info.genl_tree, 0, -1, dissect_genl_ctrl_attrs);
+		dissect_netlink_attributes(next_tvb, &hfi_genl_mptcp_attr, ett_netlink_generic, &info, info.data, info.genl_tree, 0, -1, dissect_genl_mptcp_attrs);
 	}
 
 	return offset;
@@ -590,6 +646,12 @@ proto_register_netlink_generic(void)
 		&hfi_genl_ctrl_op_flags_uns_admin_perm,
 		&hfi_genl_ctrl_group_name,
 		&hfi_genl_ctrl_group_id,
+		/* mptcp */
+		&hfi_genl_mptcp_interface_idx,
+		&hfi_genl_mptcp_token,
+		&hfi_genl_mptcp_sport,
+		&hfi_genl_mptcp_attr,
+		&hfi_genl_mptcp_local_id,
 	};
 #endif
 
