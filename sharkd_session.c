@@ -364,6 +364,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 		// Valid methods
 		{"method",     "analyse",    1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 		{"method",     "bye",        1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
+		{"method",     "capture",    1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 		{"method",     "check",      1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 		{"method",     "complete",   1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 		{"method",     "download",   1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
@@ -381,6 +382,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
 		{"method",     "tap",        1, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 
 		// Parameters and their method context
+		{"capture",    "interface",  2, JSMN_STRING,       SHARKD_JSON_STRING,   MANDATORY},
 		{"check",      "field",      2, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 		{"check",      "filter",     2, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
 		{"complete",   "field",      2, JSMN_STRING,       SHARKD_JSON_STRING,   OPTIONAL},
@@ -4282,6 +4284,69 @@ sharkd_session_process_complete(char *buf, const jsmntok_t *tokens, int count)
 	sharkd_json_result_epilogue();
 
 	return 0;
+}
+
+/**
+ * sharkd_session_process_setcomment()
+ *
+ * Process setcomment request
+ *
+ * Input:
+ *   (m) frame - frame number
+ *   (o) comment - user comment
+ *
+ * Output object with attributes:
+ *   (m) err   - error code: 0 succeed
+ *
+ * Note:
+ *   For now, adds comments, doesn't remove or replace them.
+ */
+static void
+sharkd_session_process_capture(char *buf, const jsmntok_t *tokens, int count)
+{
+	const char *tok_frame   = json_find_attr(buf, tokens, count, "frame");
+	const char *tok_comment = json_find_attr(buf, tokens, count, "comment");
+
+	guint32 framenum;
+	frame_data *fdata;
+	wtap_opttype_return_val ret;
+	wtap_block_t pkt_block = NULL;
+
+	if (!tok_frame || !ws_strtou32(tok_frame, NULL, &framenum) || framenum == 0)
+	{
+		sharkd_json_error(
+			rpcid, -3001, NULL,
+			"Frame number must be a positive integer"
+		);
+		return;
+	}
+
+	fdata = sharkd_get_frame(framenum);  // BUG HERE - If no file loaded you get a crash
+	if (!fdata)
+	{
+		sharkd_json_error(
+			rpcid, -3002, NULL,
+			"Frame number is out of range"
+		);
+		return;
+	}
+
+	pkt_block = sharkd_get_packet_block(fdata);
+
+	ret = wtap_block_add_string_option(pkt_block, OPT_COMMENT, tok_comment, strlen(tok_comment));
+
+	if (ret != WTAP_OPTTYPE_SUCCESS)
+	{
+		sharkd_json_error(
+			rpcid, -3003, NULL,
+			"Unable to set the comment"
+		);
+	}
+	else
+	{
+		sharkd_set_modified_block(fdata, pkt_block);
+		sharkd_json_simple_ok(rpcid);
+	}
 }
 
 /**
